@@ -1,0 +1,39 @@
+data:
+  format: "brainvision"                   # Brain Products file triplet
+  root: "C:/Users/brodi/PHD/EEG_study_2/eeg_pipeline/raw"
+  pattern: "sub-*_block*-task.vhdr"      # we will write .vhdr + .vmrk + .eeg
+
+montage: "standard_1020"                 # 10-20 names like Fz, Pz, Oz
+
+filters:
+  hp: 0.1
+  lp: 120.0
+  notch: 50.0
+
+ica:
+  do_ica: true
+  n_components: 25
+  eog_channels: []                 # put your EOG labels here if you have them
+
+epochs:
+  # Put the event code that marks the start of the delay here.
+  # If you only have one code for "trial start" and the delay begins at +x s,
+  # we will crop later so it still becomes a 1 s delay epoch.
+  event_id:
+    trial: 1
+  tmin: 0.0                        # 0 relative to delay onset marker
+  tmax: 1.0                        # exactly your 1 s delay
+  baseline: null                   # usually no baseline for delay-only windows
+  delay_window: [0.0, 1.0]         # keep this in sync with tmin/tmax
+
+pac:
+  phase_band: [4.0, 7.0]           # theta phase
+  amp_band:   [55.0, 85.0]         # higher gamma amplitude
+  surrogates: 200
+  trim: 0.10
+
+rest:
+  iaf:
+    channel: "Oz"                  # or an occipital ROI
+    band: [6.0, 14.0]
+    welch_win: 4.0
