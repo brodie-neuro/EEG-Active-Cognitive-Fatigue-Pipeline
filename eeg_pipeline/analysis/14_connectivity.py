@@ -17,11 +17,12 @@ EPOCHS_DIR = pipeline_dir / "outputs" / "derivatives" / "epochs_clean"
 OUTPUT_DIR = pipeline_dir / "outputs" / "features"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Region pairs for connectivity
+# Region pairs for connectivity (using same 9-node structure)
+# RF_RP is PRIMARY for visuospatial WM (right-lateralised)
 REGION_PAIRS = {
-    'CF_CP': (['Fz', 'FCz'], ['Pz', 'POz']),
-    'LF_LP': (['F7', 'F3'], ['P7', 'P3']),
-    'RF_RP': (['F8', 'F4'], ['P8', 'P4'])
+    'RF_RP': (['F8', 'F4', 'FC6'], ['P8', 'P4', 'PO8']),  # PRIMARY: Right visuospatial pathway
+    'CF_CP': (['Fz', 'FCz'], ['Pz', 'POz']),              # Secondary: Central executive
+    'LF_LP': (['F7', 'F3', 'FC5'], ['P7', 'P3', 'PO7'])   # Exploratory: Left verbal
 }
 
 THETA_BAND = (4, 7)

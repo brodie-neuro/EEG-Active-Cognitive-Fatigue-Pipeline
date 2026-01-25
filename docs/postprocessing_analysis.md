@@ -120,14 +120,22 @@ For each participant and each of 9 nodes:
 | **Cross-frequency** | Frontal theta phase → Parietal gamma amplitude |
 | **Analysis Window** | Same delay period (800–1800 ms post-stimulus) |
 
+**Region Pairs (using same 9-node structure):**
+
+| Pair | Justification | Priority |
+|:-----|:--------------|:---------|
+| **RF → RP** | Visuospatial WM is right-lateralised | **Primary** |
+| CF → CP | General executive control | Secondary |
+| LF → LP | Verbal/phonological (lower priority for visual task) | Exploratory |
+
 **Connectivity Metrics:**
 
-1. **ΔPLV_θ (Frontal-Parietal):** Change in theta-band phase synchrony
-2. **ΔPAC_cross (F→P):** Change in frontal theta phase driving parietal gamma amplitude
+1. **ΔPLV_θ (RF-RP):** Change in theta-band phase synchrony (right pathway)
+2. **ΔPAC_cross (RF→RP):** Change in right frontal theta phase driving right parietal gamma amplitude
 
 **Use in Model:**
-- Add ΔPLV_θ and ΔPAC_cross as predictors alongside nodal ΔPAC
-- Test whether **connectivity breakdown** predicts performance decline above nodal changes alone
+- Add ΔPAC_cross (RF→RP) as predictor alongside nodal ΔPAC
+- Test whether **cross-region breakdown** predicts performance decline above local nodal changes
 
 ---
 
@@ -180,45 +188,39 @@ Multiple regression model predicting individual **Δd′** from individual **ΔP
 
 ---
 
-## Step 7: Integrated Modelling — Disambiguating Effort vs Fatigue
+## Step 7: Integrated Modelling — Hierarchical Model Comparison
 
-**Rationale:** Move beyond analysing individual neural markers. Test how combined patterns distinguish "high effort" from "system fatigue". A rise in theta power could mean either—meaning becomes clear when viewed with network integrity (PAC) and processing speed (frequency).
+**Rationale:** Test whether neural markers predict performance decline, and compare which level of analysis provides the best prediction.
 
-### Primary Model (Parsimonious)
+### Model Comparison (Hierarchical)
 
-**Core predictors (theory-driven):**
+| Model | Predictors | Tests |
+|:------|:-----------|:------|
+| **M1: Base** | d′_Block1 + Δθ + ΔP3b + Δθ×ΔP3b | Effort-capacity dissociation |
+| **M2: + Local PAC** | M1 + ΔPAC_RF, ΔPAC_RP, ΔPAC_CF, ΔPAC_CP | Does local nodal PAC add explained variance? |
+| **M3: + Community** | M1 + ΔPAC_community (Louvain mean) | Does network-level PAC add variance over individual nodes? |
+| **M4: + Cross-region** | M1 + ΔPAC_cross(RF→RP) | Does frontal→parietal coordination add variance? |
+| **M5: Full** | M1 + ΔPAC_community + ΔPAC_cross(RF→RP) | Best combined model |
+
+**Model comparison:** ΔR², AIC, BIC between nested models
+
+### Parsimonious Primary Hypothesis Test
+
+**Core model (theory-driven):**
 
 | Predictor | Rationale |
 |:----------|:----------|
-| **ΔθPower** | Effort/cognitive demand |
+| **ΔθPower** | Compensatory effort |
 | **ΔP3b** | Resource allocation capacity |
-| **Δθ × ΔP3b** | Dissociation interaction (key test) |
-| **ΔPAC_community** | Network integrity (community mean from Louvain) |
+| **Δθ × ΔP3b** | Effort-capacity dissociation |
+| **ΔPAC_cross(RF→RP)** | Right frontoparietal coordination |
 
-**Covariates:** d′_Block1 (baseline ability)
-
-### Interaction Hypothesis
-
-If the **Δθ × ΔP3b interaction** is significant and **negative**:
-> "When theta increases AND P3b decreases simultaneously, performance decline is greatest"
-
-This confirms the **effort-capacity dissociation** — trying harder (θ↑) while resources deplete (P3b↓) = fatigue breakdown.
+This tests the core theory: fatigue = effort up, capacity down, coordination broken.
 
 ### Interpretation of Patterns
 
 | Pattern | Indicators | Interpretation |
 |:--------|:-----------|:---------------|
-| **Sustained Effort** | Δθ↑, ΔP3b stable, ΔPAC stable | Resilient system under load |
-| **Fatigue Breakdown** | Δθ↑, ΔP3b↓, ΔPAC↓ | Fatigued system failing despite effort |
+| **Sustained Effort** | Δθ↑, ΔP3b stable, ΔPAC stable | Resilient system |
+| **Fatigue Breakdown** | Δθ↑, ΔP3b↓, ΔPAC_cross↓ | System failing despite effort |
 | **Disengagement** | Δθ↓, ΔP3b↓ | Gave up |
-
-### Exploratory Analyses (Secondary)
-
-The following are not in the primary model but may be examined for supplementary findings:
-- Individual nodal ΔPAC values (9 predictors)
-- ΔIAF, Δfθ (frequency slowing)
-- Δγ_low (low gamma power)
-- Connectivity metrics (ΔPLV_θ, ΔPAC_cross)
-
-> **Note:** These are not hypothesis-driven and should be corrected for multiple comparisons if reported.
-
