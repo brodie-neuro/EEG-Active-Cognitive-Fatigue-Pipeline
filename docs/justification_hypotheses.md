@@ -1,156 +1,136 @@
 # Hypothesis Justification Document
-## EEG Study: Active Cognitive Fatigue and Working Memory
+## Does Cognitive Fatigue Disrupt the Theta-Gamma Neural Code?
 
 **Target Journal:** Nature Human Behaviour  
 **Theoretical Foundation:** Mangan & Kourtis (JCN) - "The Missing Link: Bridging Cognitive Fatigue with Working Memory"
 
 ---
 
-## Core Theory
+## Central Question
 
-Active cognitive fatigue degrades working memory performance through disruption of theta-gamma cross-frequency coupling (CFC) — the neural mechanism that coordinates information maintenance (Lisman & Jensen, 2013; Miller et al., 2018).
-
----
-
-## Primary Hypotheses
-
-### H1: Effort-Capacity Dissociation
-
-**Prediction:** Theta power increases (compensatory effort) while P3b amplitude decreases (capacity depletion) under fatigue.
-
-| Marker | Expected Change | Mechanism |
-|:-------|:----------------|:----------|
-| θ Power (Fz) | ↑ Increase | ACC/MFC compensatory effort |
-| P3b (Pz) | ↓ Decrease | Reduced attentional resource allocation |
-
-**Test:** Δθ × ΔP3b interaction predicting Δd′; interaction should be **negative** (when both move in opposite directions, performance suffers most).
-
-**Justification:** Distinguishes "trying harder" from "system failing" — central to the JCN theory.
+Active cognitive fatigue degrades working memory performance. We propose this occurs through disruption of cross-frequency coupling — the brain's mechanism for coordinating information maintenance.
 
 ---
 
-### H2: Cross-Frequency Coupling Breakdown
+## Primary Hypothesis
 
-**Prediction:** Theta-gamma PAC decreases with fatigue, reflecting breakdown of the neural code for WM maintenance.
+### H1: Fatigue Disrupts Frontoparietal Cross-Frequency Coupling
 
-| Measure | Expected Change | Mechanism |
-|:--------|:----------------|:----------|
-| ΔPAC_cross (RF→RP) | ↓ Decrease | Frontal theta no longer coordinating parietal gamma |
+**In plain words:** Under fatigue, the frontal brain regions lose their ability to coordinate activity in parietal regions. Specifically, the timing of slow frontal rhythms no longer organises the fast bursts of activity in parietal cortex that represent memory items.
 
-**Test:** ΔPAC_cross(RF→RP) predicts Δd′ beyond θ and P3b alone.
+**What we measure:** Cross-frequency coupling between right frontal and right parietal regions (RF→RP).
 
-**Justification:** Right frontoparietal pathway is primary for visuospatial WM (D'Esposito & Postle, 2015). This tests whether the theta-gamma code breaks down, as proposed in JCN.
+**What we expect:** Coupling strength decreases from Block 1 to Block 5, and this decrease predicts performance decline.
 
----
+**Why right hemisphere?** The task uses visual-spatial stimuli, which preferentially engage right-lateralised brain networks (D'Esposito & Postle, 2015).
 
-## Secondary Hypotheses
-
-### H3: Processing Speed Slowing
-
-**Prediction:** Individual alpha frequency (IAF) decreases with fatigue.
-
-| Measure | Expected Change | Interpretation |
-|:--------|:----------------|:---------------|
-| ΔIAF | ↓ Decrease | Global cortical processing speed slowing |
-
-**Test:** ΔIAF predicts Δd′.
-
-**Justification:** IAF is a stable trait marker of processing speed (Klimesch, 1999). Slowing indicates fatigue-induced cortical state change.
+**Core justification:** The theta-gamma neural code (Lisman & Jensen, 2013) is fundamental to working memory — theta provides the temporal scaffold, gamma represents individual items. If fatigue disrupts this coordination, working memory breaks down.
 
 ---
 
-### H4: Theta Frequency Mistuning
+## Secondary Hypothesis
 
-**Prediction:** Task-related theta frequency (fθ) slows, indicating the theta scaffold is no longer optimally tuned.
+### H2: Theta Rhythm Becomes Mistuned Under Fatigue
 
-| Measure | Expected Change | Interpretation |
-|:--------|:----------------|:---------------|
-| Δfθ | ↓ Decrease | Theta rhythm mistuned for task demands |
+**In plain words:** The speed of the brain's "scaffolding rhythm" (theta) slows down or becomes irregular with fatigue. When this rhythm is no longer at the right speed, information can't be properly organised.
 
-**Test:** Δfθ predicts Δd′ beyond θ power.
+**What we measure:** Individual theta frequency during the memory delay period.
 
-**Justification:** Novel measure — extends the "theta paradox" (θ power up, but θ frequency slowing suggests coordination impairment).
+**What we expect:** Theta frequency decreases from Block 1 to Block 5.
 
----
-
-### H5: Network-Level Coordination
-
-**Prediction:** PAC changes are coordinated across cortical regions (not isolated).
-
-| Measure | Expected Outcome | Interpretation |
-|:--------|:-----------------|:---------------|
-| Louvain communities | Right frontoparietal cluster | Visuospatial nodes fatigue together |
-
-**Test:** Community mean ΔPAC predicts Δd′ better than individual nodes.
-
-**Justification:** Tests network-level vs local breakdown — if fatigue affects distributed networks, community approach captures this.
+**Core justification:** Theta power increases with cognitive demand (the "theta paradox"). But power alone doesn't tell us if the rhythm is functioning well. Frequency slowing suggests the scaffolding is degraded, not just working harder.
 
 ---
 
 ## Exploratory Analyses
 
-| Measure | Rationale |
-|:--------|:----------|
-| Low gamma power (35-48 Hz) | Attention/local processing; may decline with P3b |
-| PLV_θ (RF-RP) | Same-frequency theta synchrony; complements cross-freq |
-| Individual nodal ΔPAC (9 nodes) | Spatial specificity of breakdown |
+### Network-Level Patterns (Louvain Communities)
+
+**In plain words:** Rather than analysing each brain region separately, we ask: do regions that serve similar functions fatigue together as coordinated networks?
+
+**What we measure:** Correlation patterns across 9 brain regions; identify clusters that change together.
+
+**What we expect:** Right frontoparietal regions (RF, RC, RP) form a cluster that declines together.
+
+**Core justification:** If fatigue affects distributed networks rather than isolated spots, this approach captures coordinated breakdown.
+
+---
+
+### Individual Alpha Frequency (IAF)
+
+**In plain words:** The brain's "idling rhythm" speed is a trait marker of cortical processing speed. Does it slow down with fatigue?
+
+**What we measure:** Peak alpha frequency at posterior sites.
+
+**What we expect:** IAF decreases from start to end of task.
+
+**Core justification:** Well-established marker (Klimesch, 1999). Provides a global measure of cortical state change.
+
+---
+
+## On P3b: To Include or Not?
+
+### The Issue
+P3b amplitude decreases with both:
+1. **Higher working memory load** (e.g., 2-back vs 3-back)
+2. **Time-on-task/fatigue** (at constant load)
+
+Hopstaken et al. (2015) showed P3b decreases across all N-back levels (1, 2, 3-back) with time-on-task, using multilevel analysis. The effect was present regardless of difficulty level.
+
+### The Confound in Your Study
+Your participants are at different N-back levels (some at 2-back, some at 3-back due to adaptive difficulty). This means P3b differences could reflect:
+- Fatigue (what you want)
+- Different cognitive demands between levels (confound)
+
+### Recommendation
+**Option A: Exclude P3b from primary analysis.** Focus on cross-frequency coupling which is the novel contribution. P3b is well-trodden ground.
+
+**Option B: Include P3b but control for N-back level.** Add level as covariate. Risk: reduced power.
+
+**Option C: Analyse only participants at same level.** Subset analysis. Risk: very small N.
+
+**For Nature portfolio:** Parsimony favours Option A. Cross-frequency coupling is the novel story. P3b can be supplementary.
 
 ---
 
 ## Model Comparison Strategy
 
-| Model | Predictors | Purpose |
-|:------|:-----------|:--------|
-| **M1** | d′_Block1 + Δθ + ΔP3b + Δθ×ΔP3b | Effort-capacity (H1) |
-| **M2** | M1 + ΔPAC_cross(RF→RP) | + Cross-region PAC (H2) |
-| **M3** | M1 + ΔPAC_community | + Network PAC (H5) |
-| **M4** | M1 + ΔIAF + Δfθ | + Frequency measures (H3, H4) |
-| **M5** | Best combination from above | Final parsimonious model |
+### In Plain Words
 
-**Comparison:** ΔR², AIC, BIC, cross-validation
+We build a series of models, each adding one new idea. We ask: does each new idea help predict who shows the biggest performance decline?
+
+| Model | What It Includes | Plain English Question |
+|:------|:-----------------|:-----------------------|
+| **M0** | Starting performance | Baseline ability only |
+| **M1** | + Frontal effort (theta power) | Does trying harder predict decline? |
+| **M2** | + Scaffold speed (theta frequency) | Does rhythm mistuning predict decline? |
+| **M3** | + Frontoparietal coordination (cross-region coupling) | Does coordination breakdown predict decline? |
+
+### How We Compare
+- **Change in R²:** How much more variance explained?
+- **Information criteria (AIC, BIC):** Is the improvement worth the complexity?
+- **Cross-validation:** Does it hold up on new data?
+
+### What Goes Where
+- **Introduction:** State hypotheses (H1, H2) in plain terms
+- **Methods:** Full model specifications
+- **Results:** Report ΔR² between nested models
 
 ---
 
-## Justification for Each Analysis Element
+## Title Options
 
-### Why Nodal PAC (Step 13)?
-- **Problem:** Single electrodes are noisy; scalp EEG has poor spatial resolution.
-- **Solution:** Aggregate electrodes into 9 anatomically-defined nodes; use trimmed mean to reject outlier electrodes.
-- **Benefit:** Robust regional estimates comparable across subjects.
-
-### Why Z-Score PAC?
-- **Problem:** Raw PAC is biased by 1/f noise and electrode impedance.
-- **Solution:** Surrogate-based Z-scoring; compare observed PAC to shuffled distribution.
-- **Benefit:** Standardised values; can compare frontal vs parietal, subjects vs subjects.
-
-### Why Cross-Region PAC (RF→RP)?
-- **Problem:** Local PAC tests coupling within a region; doesn't capture inter-regional coordination.
-- **Solution:** Compute PAC with frontal theta phase → parietal gamma amplitude.
-- **Benefit:** Tests top-down control hypothesis — frontal regions coordinating posterior processing.
-
-### Why RF→RP specifically?
-- **Problem:** Visuospatial WM is right-lateralised.
-- **Solution:** Prioritise right frontoparietal pathway.
-- **Benefit:** Hypothesis-driven, not fishing.
-
-### Why Louvain Community Detection?
-- **Problem:** 9 nodes = 9 predictors (overfitting risk).
-- **Solution:** Data-driven grouping of co-varying nodes.
-- **Benefit:** Parsimonious predictor (community mean); tests network-level hypothesis.
-
-### Why Θ × P3b Interaction?
-- **Problem:** Theta power alone is ambiguous ("theta paradox" — effort or sleep pressure?).
-- **Solution:** Combine with P3b to disambiguate.
-- **Benefit:** Effort (θ↑) + capacity intact (P3b stable) = resilient. Effort (θ↑) + capacity depleted (P3b↓) = fatigue breakdown.
+1. "Does Cognitive Fatigue Disrupt the Theta-Gamma Neural Code?"
+2. "The Missing Link: Fatigue, Cross-Frequency Coupling, and Working Memory Breakdown"
+3. "Frontoparietal Coordination Breakdown Under Cognitive Fatigue"
 
 ---
 
 ## Summary: What This Study Tests
 
-| Gap from JCN | This Study Addresses |
-|:-------------|:---------------------|
-| No PAC studies under active fatigue with WM task | ✓ WAND paradigm + theta-gamma PAC |
-| No separation of low vs high gamma | ✓ 35-48 Hz vs 55-85 Hz |
-| No network-level PAC analysis | ✓ Nodal aggregation + Louvain |
-| No link between CFC and performance | ✓ ΔPAC predicting Δd′ |
-| Theta paradox unresolved | ✓ Θ × P3b interaction + fθ |
+| Gap from JCN Paper | How This Study Addresses It |
+|:-------------------|:----------------------------|
+| No cross-frequency coupling studies under active fatigue | ✓ Theta-gamma coupling during WAND task |
+| No network-level analysis | ✓ Nodal aggregation + Louvain communities |
+| No link between coupling and performance | ✓ Coupling change predicts d′ change |
+| Theta paradox unresolved | ✓ Theta frequency as separate measure |
