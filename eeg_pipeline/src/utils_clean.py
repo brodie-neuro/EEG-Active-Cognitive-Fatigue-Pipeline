@@ -6,44 +6,38 @@ from pyprep.find_noisy_channels import NoisyChannels
 from pathlib import Path
 
 
-def run_robust_reference(raw, montage_name="standard_1020"):
+def run_robust_reference(raw):
     """
-    Applies PyPREP robust referencing.
-    1. Identifies bad channels.
-    2. Interpolates them.
-    3. Re-references to the average of the GOOD channels.
+    Run PyPREP's NoisyChannels detection and RANSAC referencing.
+    Includes a safety fallback for synthetic data.
     """
-    print("--- Starting Robust Referencing (PyPREP) ---")
-
-    # PyPREP requires a montage to be set
-    # (We assume raw already has it, but good to be safe)
-    if raw.get_montage() is None:
-        montage = mne.channels.make_standard_montage(montage_name)
-        raw.set_montage(montage, match_case=False)
+    import pyprep
+    import numpy as np
 
     # 1. Setup PyPREP
-    # We must pass the raw data and the sample rate
-    nd = NoisyChannels(raw, random_state=42)
+    nd = pyprep.NoisyChannels(raw, random_state=42)
 
-    # 2. Find all types of bad channels
-    nd.find_all_bads(ransac=True)
+    # 2. Try running full RANSAC
+    try:
+        print("Running PyPREP/RANSAC (this takes ~30-60s)...")
+        nd.find_all_bads(ransac=True)
+    except IndexError:
+        # GPT's Catch: If RANSAC crashes due to "float indices" (often caused by synthetic data)
+        print("\n!!! RANSAC CRASHED (Known Issue with Synthetic Data) !!!")
+        print("Falling back to standard artifact detection (ransac=False)...")
+        nd.find_all_bads(ransac=False)
 
-    # Get the list of bads
+    # 3. Get the bad channels
     bads = nd.get_bads()
-    print(f"Found {len(bads)} bad channels: {bads}")
 
-    # 3. Interpolate the bads
-    # PyPREP identifies them, but we use MNE to fix them
+    # 4. Interpolate bads and re-reference
+    print(f"Found {len(bads)} bad channels: {bads}")
     raw.info['bads'] = bads
     raw_clean = raw.copy()
     raw_clean.interpolate_bads(reset_bads=True)
-
-    # 4. Re-reference to Average
-    # Now that bads are fixed, we can safely average all channels
     raw_clean.set_eeg_reference(ref_channels="average", projection=False)
 
     return raw_clean, bads
-
 
 def plot_before_after(raw_orig, raw_clean, bads, out_path):
     """Generates a comparison plot to verify the cleaning."""

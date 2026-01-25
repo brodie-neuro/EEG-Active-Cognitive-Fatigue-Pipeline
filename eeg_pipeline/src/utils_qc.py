@@ -2,16 +2,22 @@
 import numpy as np
 import mne
 
+
 def basic_filters(raw, hp, lp, notch):
     raw = raw.copy()
-    raw.filter(hp, lp, fir_design="firwin", n_jobs="auto")
+    raw.filter(hp, lp, fir_design="firwin", n_jobs=-1)
+
     if notch:
-        raw.notch_filter(freqs=[notch], n_jobs="auto")
+        raw.notch_filter(freqs=[notch], n_jobs=-1)
+
     return raw
+
 
 def find_bad_channels(raw, flat_thresh_uv=0.01, noisy_thresh_std=5.0):
     data = raw.get_data(picks="eeg")
-    ptp = data.ptp(axis=1)
+
+    ptp = np.ptp(data, axis=1)
+
     eeg_names = raw.copy().pick("eeg").ch_names
     flat = [ch for ch, amp in zip(eeg_names, ptp) if amp < flat_thresh_uv * 1e-6]
 

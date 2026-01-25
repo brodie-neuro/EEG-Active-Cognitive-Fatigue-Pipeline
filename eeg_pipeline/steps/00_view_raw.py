@@ -16,7 +16,7 @@ def main():
     raw = mne.io.read_raw_brainvision(vhdr, preload=True)
 
     raw.plot(
-        n_channels=32, duration=8.0,
+        n_channels=64, duration=8.0,
         scalings=dict(eeg=20e-6, eog=200e-6, emg=100e-6),
         block=True,
     )
