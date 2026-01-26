@@ -188,39 +188,48 @@ Multiple regression model predicting individual **Δd′** from individual **ΔP
 
 ---
 
-## Step 7: Integrated Modelling — Hierarchical Model Comparison
+## Step 7: Integrated Modelling — The Theta Paradox
 
-**Rationale:** Test whether neural markers predict performance decline, and compare which level of analysis provides the best prediction.
+**Rationale:** Test whether the combined pattern of neural markers can distinguish between "high effort" and "system breakdown". Theta power alone is ambiguous (the paradox). Its meaning becomes clear when viewed with scaffold quality (fθ) and long-range coordination (cross-region PAC).
 
-### Model Comparison (Hierarchical)
+### Primary Integrated Model
 
-| Model | Predictors | Tests |
-|:------|:-----------|:------|
-| **M1: Base** | d′_Block1 + Δθ + ΔP3b + Δθ×ΔP3b | Effort-capacity dissociation |
-| **M2: + Local PAC** | M1 + ΔPAC_RF, ΔPAC_RP, ΔPAC_CF, ΔPAC_CP | Does local nodal PAC add explained variance? |
-| **M3: + Community** | M1 + ΔPAC_community (Louvain mean) | Does network-level PAC add variance over individual nodes? |
-| **M4: + Cross-region** | M1 + ΔPAC_cross(RF→RP) | Does frontal→parietal coordination add variance? |
-| **M5: Full** | M1 + ΔPAC_community + ΔPAC_cross(RF→RP) | Best combined model |
+```
+Δd′ ~ d′_Block1 + Δθ_power + Δfθ + ΔPAC_cross(RF→RP)
+```
 
-**Model comparison:** ΔR², AIC, BIC between nested models
-
-### Parsimonious Primary Hypothesis Test
-
-**Core model (theory-driven):**
-
-| Predictor | Rationale |
-|:----------|:----------|
-| **ΔθPower** | Compensatory effort |
-| **ΔP3b** | Resource allocation capacity |
-| **Δθ × ΔP3b** | Effort-capacity dissociation |
-| **ΔPAC_cross(RF→RP)** | Right frontoparietal coordination |
-
-This tests the core theory: fatigue = effort up, capacity down, coordination broken.
+| Predictor | What It Tests |
+|:----------|:--------------|
+| **d′_Block1** | Baseline ability (covariate) |
+| **Δθ_power** | Compensatory effort — are they trying harder? |
+| **Δfθ** | Scaffold quality — is the theta rhythm appropriately tuned? |
+| **ΔPAC_cross(RF→RP)** | Frontoparietal coordination — is frontal controlling parietal? |
 
 ### Interpretation of Patterns
 
 | Pattern | Indicators | Interpretation |
 |:--------|:-----------|:---------------|
-| **Sustained Effort** | Δθ↑, ΔP3b stable, ΔPAC stable | Resilient system |
-| **Fatigue Breakdown** | Δθ↑, ΔP3b↓, ΔPAC_cross↓ | System failing despite effort |
-| **Disengagement** | Δθ↓, ΔP3b↓ | Gave up |
+| **Sustained Effort** | Δθ↑, Δfθ stable, ΔPAC stable | System working under load |
+| **Fatigue Breakdown** | Δθ↑, Δfθ↓, ΔPAC↓ | Trying harder but scaffold broken and coordination lost |
+| **Disengagement** | Δθ↓, ΔPAC↓ | Gave up |
+
+### Hierarchical Model Comparison
+
+| Model | Predictors | Question |
+|:------|:-----------|:---------|
+| **M1** | d′_Block1 + Δθ_power | Does effort predict decline? |
+| **M2** | M1 + Δfθ | Does scaffold mistuning add prediction? |
+| **M3** | M2 + ΔPAC_cross(RF→RP) | Does coordination breakdown add prediction? |
+
+**Comparison:** ΔR², AIC, likelihood ratio tests
+
+### Exploratory: PAC Level Comparison
+
+| Model | PAC Type | Question |
+|:------|:---------|:---------|
+| M3a | + ΔPAC_RF (local frontal node) | Does local PAC predict? |
+| M3b | + ΔPAC_community (Louvain) | Does network-level PAC predict? |
+| M3c | + ΔPAC_cross(RF→RP) | Does cross-region PAC predict? |
+
+Compare ΔR² between M3a, M3b, M3c to determine which level of analysis is most informative.
+

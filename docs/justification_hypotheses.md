@@ -104,12 +104,30 @@ We build a series of models, each adding one new idea. We ask: does each new ide
 | **M0** | Starting performance | Baseline ability only |
 | **M1** | + Frontal effort (theta power) | Does trying harder predict decline? |
 | **M2** | + Scaffold speed (theta frequency) | Does rhythm mistuning predict decline? |
-| **M3** | + Frontoparietal coordination (cross-region coupling) | Does coordination breakdown predict decline? |
+| **M3** | + Frontoparietal coordination (cross-region PAC) | Does coordination breakdown predict decline? |
+
+### Primary Integrated Model
+
+```
+Δd′ ~ d′_Block1 + Δθ_power + Δfθ + ΔPAC_cross(RF→RP)
+```
+
+This model tests the **theta paradox**: theta power alone is ambiguous (effort or breakdown?). Its meaning becomes clear when combined with scaffold quality and coordination.
 
 ### How We Compare
 - **Change in R²:** How much more variance explained?
 - **Information criteria (AIC, BIC):** Is the improvement worth the complexity?
 - **Cross-validation:** Does it hold up on new data?
+
+### Exploratory: PAC Level Comparison
+
+| Model | PAC Type | Question |
+|:------|:---------|:---------|
+| M3a | + ΔPAC_RF (local frontal node) | Does local PAC predict? |
+| M3b | + ΔPAC_community (Louvain) | Does network-level PAC predict? |
+| M3c | + ΔPAC_cross(RF→RP) | Does cross-region PAC predict? |
+
+Compare ΔR² between these to determine which level of analysis is most informative.
 
 ### What Goes Where
 - **Introduction:** State hypotheses (H1, H2) in plain terms
