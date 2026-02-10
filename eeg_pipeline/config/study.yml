@@ -5,6 +5,10 @@ data:
 
 montage: "standard_1020"                 # 10-20 names like Fz, Pz, Oz
 
+blocks: [1, 5]                           # Blocks to compare (baseline vs fatigued)
+
+behavioral_data: null                    # Path to d' CSV — set when available
+
 filters:
   hp: 0.1
   lp: 120.0
@@ -16,24 +20,52 @@ ica:
   eog_channels: []                 # put your EOG labels here if you have them
 
 epochs:
-  # Put the event code that marks the start of the delay here.
-  # If you only have one code for "trial start" and the delay begins at +x s,
-  # we will crop later so it still becomes a 1 s delay epoch.
-  event_id:
-    trial: 1
-  tmin: 0.0                        # 0 relative to delay onset marker
-  tmax: 1.0                        # exactly your 1 s delay
-  baseline: null                   # usually no baseline for delay-only windows
-  delay_window: [0.0, 1.0]         # keep this in sync with tmin/tmax
+  # Stimulus-locked epochs (P3b analysis)
+  p3b:
+    tmin: -0.2
+    tmax: 0.8
+    baseline: [-0.2, 0.0]
+  # Stimulus-offset-locked epochs (PAC/theta, maintenance period)
+  pac:
+    tmin: 0.0                      # relative to Trigger 2 (stimulus offset)
+    tmax: 1.0                      # 1 s maintenance window
+    baseline: null
 
+# Spectral parameterisation (specparam / FOOOF)
+specparam:
+  freq_range: [1, 30]
+  peak_width_limits: [1, 8]
+  max_n_peaks: 6
+  min_peak_height: 0.1
+
+# Phase-amplitude coupling
 pac:
-  phase_band: [4.0, 7.0]           # theta phase
-  amp_band:   [55.0, 85.0]         # higher gamma amplitude
+  phase_band: [4, 8]               # theta phase
+  amp_band: [55, 85]               # high gamma amplitude
   surrogates: 200
-  trim: 0.10
+  trim: 0.10                       # 10% trimmed mean
 
+# 9-node structure (64-channel actiCAP layout)
+nodes:
+  LF: ['F7', 'F3', 'FC5']
+  CF: ['Fz', 'FCz', 'Cz']
+  RF: ['F8', 'F4', 'FC6']
+  LC: ['T7', 'C3', 'CP5']
+  C:  ['Cz', 'CPz']
+  RC: ['T8', 'C4', 'CP6']
+  LP: ['P7', 'P3', 'PO7']
+  CP: ['Pz', 'POz']
+  RP: ['P8', 'P4', 'PO8']
+
+# Regional aggregation (3 regions for inferential models)
+regions:
+  Frontal: ['LF', 'CF', 'RF']
+  Central: ['LC', 'C', 'RC']
+  Parietal: ['LP', 'CP', 'RP']
+
+# IAF extraction
 rest:
   iaf:
-    channel: "Oz"                  # or an occipital ROI
-    band: [6.0, 14.0]
+    channel: "Oz"
+    band: [7.0, 14.0]
     welch_win: 4.0

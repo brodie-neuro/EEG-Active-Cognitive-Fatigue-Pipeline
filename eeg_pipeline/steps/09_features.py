@@ -11,7 +11,7 @@ import pandas as pd
 
 pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
-from src.utils_io import load_config
+from src.utils_io import load_config, subj_id_from_derivative
 
 
 def extract_p3b_features(epochs, ch_name='Pz'):
@@ -72,7 +72,7 @@ def main():
     p3b_files = sorted(list(epochs_dir.glob("*_p3b_clean-epo.fif")))
     
     for f in p3b_files:
-        subj = f.name.split("_")[0]
+        subj = subj_id_from_derivative(f)
         print(f"--- Extracting features for {subj} ---")
         
         row = {'subject': subj}

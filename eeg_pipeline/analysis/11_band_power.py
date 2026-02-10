@@ -1,7 +1,13 @@
 # eeg_pipeline/analysis/11_band_power.py
 """
-Step 11: Band Power Analysis
-Extracts theta, alpha, beta, gamma power from task epochs.
+Step 5 — Frontal Midline Theta (FMθ) Power
+
+Extracts theta power (4-8 Hz) at the CF node during the maintenance
+window. Log-transformed. Outputs long format: one row per subject × block.
+
+This feeds into the integrated model (H4, Step 6) as the 'effort' marker.
+
+Reference: post_processing_EEG_plan_v2.docx, Step 5
 """
 import sys
 from pathlib import Path
@@ -12,83 +18,85 @@ import pandas as pd
 pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
 
-EPOCHS_DIR = pipeline_dir / "outputs" / "derivatives" / "epochs_clean"
+from src.utils_io import load_config
+from src.utils_features import (
+    load_block_epochs, get_subjects_with_blocks,
+    available_channels, get_node_channels
+)
+
 OUTPUT_DIR = pipeline_dir / "outputs" / "features"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# Band definitions (per postprocessing_analysis.md)
-BANDS = {
-    'theta': (4, 8),
-    'alpha': (8, 13),
-    'beta': (13, 30),
-    'gamma_low': (35, 48),   # Low gamma - attention, local processing (below 50Hz line noise)
-    'gamma_high': (55, 85)   # High gamma - WM, cognition (above 50Hz line noise)
-}
-
-# Region-specific channels for each band
-BAND_CHANNELS = {
-    'theta': ['Fz', 'FCz', 'Cz'],          # Frontal theta
-    'alpha': ['Oz', 'POz', 'O1', 'O2'],     # Posterior alpha
-    'beta': ['Cz', 'C3', 'C4'],             # Central beta
-    'gamma_low': None,                      # All EEG channels
-    'gamma_high': None                      # All EEG channels
-}
+THETA_BAND = (4, 8)
 
 
-def compute_band_power(epochs, band_name):
-    """Compute mean power in specified frequency band."""
-    fmin, fmax = BANDS[band_name]
-    
-    # Select channels for this band
-    ch_picks = BAND_CHANNELS.get(band_name)
-    if ch_picks:
-        available = [ch for ch in ch_picks if ch in epochs.ch_names]
-        if not available:
-            available = None
-    else:
-        available = None
-    
-    # Compute PSD
+def compute_theta_power(epochs, ch_picks, fmin=4, fmax=8):
+    """
+    Compute mean theta power (log-transformed) at specified channels.
+
+    Returns
+    -------
+    float : log10 theta power (µV²)
+    """
+    avail = available_channels(ch_picks, epochs.ch_names)
+    if not avail:
+        avail = None
+
     try:
-        psd = epochs.compute_psd(fmin=fmin, fmax=fmax, picks=available, verbose=False)
-        power = psd.get_data().mean()  # Mean across epochs, channels, frequencies
-        return power * 1e12  # Convert to µV²
-    except:
+        psd = epochs.compute_psd(fmin=fmin, fmax=fmax, picks=avail, verbose=False)
+        power = psd.get_data().mean()
+        power_uv2 = power * 1e12  # Convert to µV²
+        return np.log10(power_uv2) if power_uv2 > 0 else np.nan
+    except Exception as e:
+        print(f"  Theta power failed: {e}")
         return np.nan
 
 
 def main():
-    files = sorted(list(EPOCHS_DIR.glob("*_pac_clean-epo.fif")))
-    if not files:
-        print(f"No epoch files found in {EPOCHS_DIR}")
+    cfg = load_config()
+    blocks = cfg.get('blocks', [1, 5])
+    epochs_dir = pipeline_dir / "outputs" / "derivatives" / "epochs_clean"
+
+    cf_channels = get_node_channels('CF', cfg)
+    if not cf_channels:
+        cf_channels = ['Fz', 'FCz', 'Cz']
+
+    if not epochs_dir.exists():
+        print(f"Epochs directory not found: {epochs_dir}")
         return
-    
-    results = []
-    
-    for f in files:
-        subj = f.stem.split("_")[0]
-        print(f"--- Band Power Analysis: {subj} ---")
-        
-        epochs = mne.read_epochs(f, preload=True, verbose=False)
-        
-        if len(mne.pick_types(epochs.info, eeg=True)) == 0:
-            print(f"No EEG channels for {subj} - skipping")
-            continue
-        
-        row = {'subject': subj}
-        
-        for band_name in BANDS:
-            power = compute_band_power(epochs, band_name)
-            row[f'{band_name}_power'] = power
-            print(f"  {band_name}: {power:.4f} µV²")
-        
-        results.append(row)
-    
-    if results:
-        df = pd.DataFrame(results)
-        output_file = OUTPUT_DIR / "band_power_features.csv"
+
+    subjects = get_subjects_with_blocks(epochs_dir, 'pac', blocks)
+    if not subjects:
+        legacy = sorted(epochs_dir.glob("*_pac_clean-epo.fif"))
+        subjects = sorted(set(f.stem.split("_")[0] for f in legacy))
+    if not subjects:
+        print("No PAC epoch files found.")
+        return
+
+    rows = []
+
+    for subj in subjects:
+        print(f"--- FMθ Power: {subj} ---")
+
+        for block in blocks:
+            epochs = load_block_epochs(subj, block, 'pac', epochs_dir)
+            if epochs is None or 'eeg' not in epochs.get_channel_types():
+                continue
+
+            power = compute_theta_power(epochs, cf_channels)
+            rows.append({
+                'subject': subj,
+                'block': block,
+                'theta_power_log': power,
+            })
+            print(f"  Block {block}: log10(θ) = {power:.4f}")
+
+    if rows:
+        df = pd.DataFrame(rows)
+        output_file = OUTPUT_DIR / "theta_power_features.csv"
         df.to_csv(output_file, index=False)
-        print(f"\nSaved band power features to {output_file}")
+        print(f"\nSaved FMθ power features (long format) to {output_file}")
+        print(df.to_string(index=False))
 
 
 if __name__ == "__main__":

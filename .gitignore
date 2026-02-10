@@ -31,3 +31,8 @@ Thumbs.db
 
 # --- 5. Exclude WAND script (separate repo) ---
 WAND_full_induction.py
+
+# --- 6. Old/superseded analysis plans and removed scripts ---
+docs/old_analysis/
+docs/v2_plan_text.txt
+eeg_pipeline/analysis/removed/

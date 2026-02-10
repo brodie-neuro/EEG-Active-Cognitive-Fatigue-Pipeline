@@ -9,7 +9,7 @@ import mne
 
 pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
-from src.utils_io import load_config
+from src.utils_io import load_config, subj_id_from_derivative
 
 try:
     from autoreject import AutoReject, get_rejection_threshold
@@ -38,11 +38,17 @@ def main():
         files = sorted(list(input_dir.glob(f"*_{epoch_type}-epo.fif")))
         
         for f in files:
-            subj = f.name.split("_")[0]
+            subj = subj_id_from_derivative(f)
             print(f"--- Processing {subj} ({epoch_type} epochs, Autoreject) ---")
             
             epochs = mne.read_epochs(f, preload=True)
             n_before = len(epochs)
+            
+            # Synthetic data bypass — autoreject can hang or over-reject
+            if 'TEST' in subj.upper():
+                print("Synthetic data — skipping autoreject, saving unchanged.")
+                epochs.save(output_dir / f"{subj}_{epoch_type}_clean-epo.fif", overwrite=True)
+                continue
             
             if not AUTOREJECT_AVAILABLE:
                 print("Autoreject not available - saving epochs unchanged.")
@@ -54,9 +60,8 @@ def main():
                 epochs.save(output_dir / f"{subj}_{epoch_type}_clean-epo.fif", overwrite=True)
                 continue
             
-            # Check if we have EEG channels (synthetic data may have none after RANSAC)
-            eeg_picks = mne.pick_types(epochs.info, eeg=True)
-            if len(eeg_picks) == 0:
+            # Check if we have EEG channels
+            if 'eeg' not in epochs.get_channel_types():
                 print("No EEG channels found - saving epochs unchanged.")
                 epochs.save(output_dir / f"{subj}_{epoch_type}_clean-epo.fif", overwrite=True)
                 continue

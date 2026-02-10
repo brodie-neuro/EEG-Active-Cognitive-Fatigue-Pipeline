@@ -62,5 +62,42 @@ def glob_subjects(root, pattern):
     return sorted([str(p) for p in Path(root).glob(pattern)])
 
 def subject_id_from_path(p):
-    base = Path(p).name
-    return base.split("_")[0]
+    """
+    Extract subject+block identifier from filename.
+
+    e.g. 'sub-TEST01_block1-task.vhdr' → 'sub-TEST01_block1'
+         'sub-TEST01.vhdr'             → 'sub-TEST01'
+    """
+    base = Path(p).stem              # 'sub-TEST01_block1-task'
+    # Strip the task suffix (everything after last hyphen if it's a task label)
+    if '-task' in base:
+        base = base.split('-task')[0]  # 'sub-TEST01_block1'
+    elif '-' in base:
+        # Fallback: keep as-is if no '-task' pattern
+        pass
+    return base
+
+
+def subj_id_from_derivative(fif_path):
+    """
+    Extract subject+block identifier from a derivative .fif filename.
+
+    e.g. 'sub-TEST01_block1_cleaned-raw.fif' → 'sub-TEST01_block1'
+         'sub-TEST01_block5_ica-raw.fif'     → 'sub-TEST01_block5'
+         'sub-TEST01_cleaned-raw.fif'        → 'sub-TEST01'
+
+    Strips the processing suffix (e.g. '_cleaned-raw', '_ica-raw', '_asr-raw').
+    """
+    stem = Path(fif_path).stem          # 'sub-TEST01_block1_cleaned-raw'
+    # Remove the known processing suffixes
+    for suffix in ['-raw', '-epo']:
+        if suffix in stem:
+            stem = stem.rsplit(suffix, 1)[0]    # 'sub-TEST01_block1_cleaned'
+    # Remove the last underscore-separated token (the processing label)
+    parts = stem.rsplit('_', 1)
+    if len(parts) == 2 and parts[1] in (
+        'cleaned', 'referenced', 'zapline', 'ica', 'asr',
+        'p3b', 'pac', 'clean'
+    ):
+        return parts[0]                 # 'sub-TEST01_block1'
+    return stem

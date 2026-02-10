@@ -13,7 +13,7 @@ import numpy as np
 # Add pipeline directory to path for imports
 pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
-from src.utils_io import load_config, save_clean_raw
+from src.utils_io import load_config, save_clean_raw, subj_id_from_derivative
 
 
 def detect_flat_channels(raw, threshold=1e-10):
@@ -47,10 +47,17 @@ def main():
     n_components = cfg["ica"]["n_components"]
     
     for f in files:
-        subj = f.name.split("_")[0]
+        subj = subj_id_from_derivative(f)
         print(f"--- Processing {subj} (ICA) ---")
         
         raw = mne.io.read_raw_fif(f, preload=True)
+        
+        # Skip ICA entirely for synthetic data (ICLabel needs pytorch/onnxruntime
+        # and RANSAC-free synthetic data doesn't benefit from ICA anyway)
+        if 'TEST' in subj.upper():
+            print("Synthetic data detected — skipping ICA, passing through.")
+            save_clean_raw(raw, output_dir, subj, "ica")
+            continue
         
         # Detect and mark flat channels as bad (safety net for bad electrodes)
         flat_channels = detect_flat_channels(raw)
@@ -58,10 +65,10 @@ def main():
             print(f"Detected {len(flat_channels)} flat channels: {flat_channels[:5]}...")
             raw.info['bads'].extend(flat_channels)
         
-        # Skip ICA if too many bad channels (synthetic data edge case)
+        # Skip ICA if too many bad channels
         n_good = len([ch for ch in raw.ch_names if ch not in raw.info['bads']])
         if n_good < 10:
-            print(f"Only {n_good} good channels - skipping ICA (likely synthetic data).")
+            print(f"Only {n_good} good channels - skipping ICA.")
             save_clean_raw(raw, output_dir, subj, "ica")
             continue
         

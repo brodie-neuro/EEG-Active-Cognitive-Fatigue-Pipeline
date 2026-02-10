@@ -11,7 +11,7 @@ from meegkit.dss import dss_line
 
 pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
-from src.utils_io import load_config, save_clean_raw
+from src.utils_io import load_config, save_clean_raw, subj_id_from_derivative
 
 
 def main():
@@ -37,7 +37,7 @@ def main():
     nremove = 1   # Number of components to remove
     
     for f in files:
-        subj = f.name.split("_")[0]
+        subj = subj_id_from_derivative(f)
         print(f"--- Processing {subj} (Zapline) ---")
         
         raw = mne.io.read_raw_fif(f, preload=True)

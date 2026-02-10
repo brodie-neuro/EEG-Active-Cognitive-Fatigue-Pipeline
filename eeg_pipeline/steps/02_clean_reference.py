@@ -8,7 +8,7 @@ print(f"!!! CURRENT NUMPY VERSION: {numpy.__version__} !!!")
 # --- FIX: Point to 'eeg_pipeline' (parents[1]) ---
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-from src.utils_io import load_config, read_raw, save_clean_raw
+from src.utils_io import load_config, read_raw, save_clean_raw, subj_id_from_derivative
 from src.utils_clean import run_robust_reference, plot_before_after
 
 
@@ -36,21 +36,27 @@ def main():
 
     # 3. Loop over subjects
     for f in files:
-        subj = f.name.split("_")[0]
+        subj = subj_id_from_derivative(f)
         print(f"--- Processing {subj} ---")
 
         # Load the data from Step 01
         # It already has the correct channel types (EEG vs EMG) set
         raw = read_raw(f, fmt="fif", montage=cfg['montage'])
 
-        # --- RUN PYPREP (Robust Referencing) ---
-        # This uses RANSAC to find bad EEG channels and interpolates them.
-        # It calculates the average reference excluding those bad channels.
-        print("Running PyPREP/RANSAC (this takes ~30-60s)...")
-        raw_ref, bads = run_robust_reference(raw)
+        # Detect synthetic data — skip RANSAC (destroys spatially
+        # uncorrelated fake signals) and use simple average reference
+        is_synthetic = 'TEST' in subj.upper()
+
+        if is_synthetic:
+            print("Synthetic data detected — using simple average reference")
+            raw_ref = raw.copy().set_eeg_reference('average', projection=False)
+            bads = []
+        else:
+            # --- RUN PYPREP (Robust Referencing) ---
+            print("Running PyPREP/RANSAC (this takes ~30-60s)...")
+            raw_ref, bads = run_robust_reference(raw)
 
         # Save QC Plot (Before vs After)
-        # We save this to 'qc_figs/reference_check'
         qc_plot_path = qc_dir / f"{subj}_ref_check.png"
         plot_before_after(raw, raw_ref, bads, qc_plot_path)
         print(f"Saved QC plot to {qc_plot_path}")

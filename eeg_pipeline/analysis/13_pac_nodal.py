@@ -1,56 +1,127 @@
 # eeg_pipeline/analysis/13_pac_nodal.py
 """
-Step 13: Nodal PAC with Z-Score Normalization
-Computes theta-gamma PAC per electrode, normalizes with surrogates, aggregates to nodes.
+Step 4 — Phase-Amplitude Coupling Analysis (H1, H3)
+
+4a (H1): Between-region PAC — RF theta phase × RP gamma amplitude
+4b (H3): Local PAC — within-node, collapsed to 3 regions (F, C, P)
+4c: Descriptive 9-node ΔPAC heatmap data
+
+Uses tensorpac for PAC computation with surrogate z-scoring.
+Modulation Index (Tort et al., 2010) as the core metric.
+Outputs long format: one row per subject × block.
+
+Reference: post_processing_EEG_plan_v2.docx, Step 4
 """
 import sys
 from pathlib import Path
 import mne
 import numpy as np
 import pandas as pd
-from scipy.signal import hilbert
 from scipy.stats import trim_mean
 
 pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
 
-EPOCHS_DIR = pipeline_dir / "outputs" / "derivatives" / "epochs_clean"
+from src.utils_io import load_config
+from src.utils_features import (
+    load_block_epochs, get_subjects_with_blocks,
+    available_channels, get_node_channels, get_region_nodes
+)
+
+try:
+    from tensorpac import Pac
+    TENSORPAC_AVAILABLE = True
+except ImportError:
+    TENSORPAC_AVAILABLE = False
+    print("Warning: tensorpac not installed. Install with: pip install tensorpac")
+
 OUTPUT_DIR = pipeline_dir / "outputs" / "features"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# PAC parameters
-THETA_BAND = (4, 8)
-GAMMA_BAND = (55, 85)  # High gamma, avoids 50Hz artifact
-N_SURROGATES = 200
-TRIM_PROPORTION = 0.1  # 10% trim
 
-# Node definitions
-NODES = {
-    'LF': ['F7', 'F3', 'FC5'],
-    'CF': ['Fz', 'FCz', 'Cz'],
-    'RF': ['F8', 'F4', 'FC6'],
-    'LC': ['T7', 'C3', 'CP5'],
-    'C': ['Cz', 'CPz'],
-    'RC': ['T8', 'C4', 'CP6'],
-    'LP': ['P7', 'P3', 'PO7'],
-    'CP': ['Pz', 'POz'],
-    'RP': ['P8', 'P4', 'PO8']
-}
+def get_node_signal(epochs, node_channels):
+    """Extract mean signal across node channels. Returns (n_epochs, n_times) or None."""
+    avail = available_channels(node_channels, epochs.ch_names)
+    if not avail:
+        return None
+    data = epochs.copy().pick(avail).get_data()
+    return data.mean(axis=1)
 
 
-def modulation_index(theta_phase, gamma_amp, n_bins=18):
-    """Compute Modulation Index (Tort et al., 2010)."""
+def compute_pac_tensorpac(phase_signal, amp_signal, sfreq, cfg):
+    """Compute PAC using tensorpac with MI + surrogate z-scoring."""
+    pac_cfg = cfg.get('pac', {})
+    f_pha = pac_cfg.get('phase_band', [4, 8])
+    f_amp = pac_cfg.get('amp_band', [55, 85])
+    n_surr = pac_cfg.get('surrogates', 200)
+
+    # idpac=(2, 1, 1): MI (Tort), swap phase/amplitude, z-score
+    p = Pac(idpac=(2, 1, 1), f_pha=f_pha, f_amp=f_amp,
+            dcomplex='hilbert', verbose=False)
+
+    max_epochs = min(phase_signal.shape[0], 30)
+    pha_data = phase_signal[:max_epochs, :]
+    amp_data = amp_signal[:max_epochs, :]
+
+    try:
+        pac_vals = p.filterfit(sfreq, pha_data, amp_data, n_perm=n_surr)
+        return float(np.nanmean(pac_vals))
+    except Exception as e:
+        print(f"  tensorpac failed: {e}")
+        return np.nan
+
+
+def compute_pac_fallback(phase_signal, amp_signal, sfreq, cfg):
+    """Fallback PAC: custom MI + surrogates if tensorpac unavailable."""
+    from scipy.signal import hilbert as sp_hilbert
+
+    pac_cfg = cfg.get('pac', {})
+    f_pha = pac_cfg.get('phase_band', [4, 8])
+    f_amp = pac_cfg.get('amp_band', [55, 85])
+    n_surr = pac_cfg.get('surrogates', 200)
+
+    max_epochs = min(phase_signal.shape[0], 20)
+    epoch_pacs = []
+
+    for ep in range(max_epochs):
+        try:
+            theta = mne.filter.filter_data(
+                phase_signal[ep], sfreq, f_pha[0], f_pha[1], verbose=False)
+            theta_phase = np.angle(sp_hilbert(theta))
+            gamma = mne.filter.filter_data(
+                amp_signal[ep], sfreq, f_amp[0], f_amp[1], verbose=False)
+            gamma_amp = np.abs(sp_hilbert(gamma))
+
+            mi_real = _modulation_index(theta_phase, gamma_amp)
+
+            surr_mis = []
+            n_samples = len(theta_phase)
+            shift_range = n_samples // 4
+            for _ in range(n_surr):
+                shift = np.random.randint(shift_range, n_samples - shift_range)
+                shifted_amp = np.roll(gamma_amp, shift)
+                surr_mis.append(_modulation_index(theta_phase, shifted_amp))
+
+            mean_surr = np.mean(surr_mis)
+            std_surr = np.std(surr_mis)
+            z = (mi_real - mean_surr) / std_surr if std_surr > 0 else 0
+            epoch_pacs.append(z)
+        except Exception:
+            pass
+
+    return np.mean(epoch_pacs) if epoch_pacs else np.nan
+
+
+def _modulation_index(theta_phase, gamma_amp, n_bins=18):
+    """Tort et al. (2010) Modulation Index."""
     phase_bins = np.linspace(-np.pi, np.pi, n_bins + 1)
     mean_amp = np.zeros(n_bins)
-    
     for i in range(n_bins):
         mask = (theta_phase >= phase_bins[i]) & (theta_phase < phase_bins[i + 1])
         if mask.sum() > 0:
             mean_amp[i] = gamma_amp[mask].mean()
-    
     if mean_amp.sum() == 0:
         return 0
-    
     mean_amp = mean_amp / mean_amp.sum()
     mean_amp = np.clip(mean_amp, 1e-10, None)
     uniform = np.ones(n_bins) / n_bins
@@ -58,96 +129,136 @@ def modulation_index(theta_phase, gamma_amp, n_bins=18):
     return kl_div / np.log(n_bins)
 
 
-def compute_pac_zscore(signal, sfreq, n_surrogates=200):
-    """Compute surrogate-normalized PAC for a single channel."""
-    # Filter for theta phase
-    theta = mne.filter.filter_data(signal, sfreq, THETA_BAND[0], THETA_BAND[1], verbose=False)
-    theta_phase = np.angle(hilbert(theta))
-    
-    # Filter for gamma amplitude
-    gamma = mne.filter.filter_data(signal, sfreq, GAMMA_BAND[0], GAMMA_BAND[1], verbose=False)
-    gamma_amp = np.abs(hilbert(gamma))
-    
-    # Real PAC
-    mi_real = modulation_index(theta_phase, gamma_amp)
-    
-    # Surrogate distribution (time-shift method)
-    surr_mis = []
-    shift_range = len(signal) // 4
-    for _ in range(n_surrogates):
-        shift = np.random.randint(shift_range, len(signal) - shift_range)
-        shifted_amp = np.roll(gamma_amp, shift)
-        surr_mis.append(modulation_index(theta_phase, shifted_amp))
-    
-    # Z-score
-    mean_surr = np.mean(surr_mis)
-    std_surr = np.std(surr_mis)
-    z_pac = (mi_real - mean_surr) / std_surr if std_surr > 0 else 0
-    
-    return z_pac
+def compute_pac(phase_signal, amp_signal, sfreq, cfg):
+    """Dispatch to tensorpac or fallback."""
+    if TENSORPAC_AVAILABLE:
+        return compute_pac_tensorpac(phase_signal, amp_signal, sfreq, cfg)
+    else:
+        return compute_pac_fallback(phase_signal, amp_signal, sfreq, cfg)
 
 
-def compute_nodal_pac(epochs, node_channels):
-    """Compute PAC for a node using trimmed mean of electrode Z-scores."""
-    available = [ch for ch in node_channels if ch in epochs.ch_names]
-    if not available:
+def compute_local_node_pac(epochs, node_channels, sfreq, cfg):
+    """Compute local PAC within a node. Uses 10% trimmed mean across electrodes."""
+    avail = available_channels(node_channels, epochs.ch_names)
+    if not avail:
         return np.nan
-    
-    data = epochs.copy().pick(available).get_data()  # (n_epochs, n_ch, n_times)
-    sfreq = epochs.info['sfreq']
-    
-    # Compute Z-scored PAC for each electrode (averaged across epochs)
+
+    trim_prop = cfg.get('pac', {}).get('trim', 0.1)
+    data = epochs.copy().pick(avail).get_data()
+
     electrode_pacs = []
     for ch_idx in range(data.shape[1]):
-        epoch_pacs = []
-        for ep_idx in range(min(data.shape[0], 20)):  # Limit epochs for speed
-            try:
-                z = compute_pac_zscore(data[ep_idx, ch_idx, :], sfreq, n_surrogates=50)
-                epoch_pacs.append(z)
-            except:
-                pass
-        if epoch_pacs:
-            electrode_pacs.append(np.mean(epoch_pacs))
-    
+        ch_signal = data[:, ch_idx, :]
+        pac_val = compute_pac(ch_signal, ch_signal, sfreq, cfg)
+        if not np.isnan(pac_val):
+            electrode_pacs.append(pac_val)
+
     if not electrode_pacs:
         return np.nan
-    
-    # 10% trimmed mean across electrodes
-    return trim_mean(electrode_pacs, proportiontocut=TRIM_PROPORTION)
+    if len(electrode_pacs) >= 3:
+        return trim_mean(electrode_pacs, proportiontocut=trim_prop)
+    else:
+        return np.mean(electrode_pacs)
 
 
 def main():
-    files = sorted(list(EPOCHS_DIR.glob("*_pac_clean-epo.fif")))
-    if not files:
-        print(f"No epoch files found in {EPOCHS_DIR}")
+    cfg = load_config()
+    blocks = cfg.get('blocks', [1, 5])
+    epochs_dir = pipeline_dir / "outputs" / "derivatives" / "epochs_clean"
+
+    if not epochs_dir.exists():
+        print(f"Epochs directory not found: {epochs_dir}")
         return
-    
-    results = []
-    
-    for f in files:
-        subj = f.stem.split("_")[0]
-        print(f"--- Nodal PAC Analysis: {subj} ---")
-        
-        epochs = mne.read_epochs(f, preload=True, verbose=False)
-        
-        if len(mne.pick_types(epochs.info, eeg=True)) == 0:
-            print(f"No EEG channels for {subj} - skipping")
-            continue
-        
-        row = {'subject': subj}
-        
-        for node_name, node_chs in NODES.items():
-            pac = compute_nodal_pac(epochs, node_chs)
-            row[f'pac_{node_name}'] = pac
-            print(f"  {node_name}: Z={pac:.2f}" if not np.isnan(pac) else f"  {node_name}: N/A")
-        
-        results.append(row)
-    
-    if results:
-        df = pd.DataFrame(results)
-        output_file = OUTPUT_DIR / "pac_nodal_features.csv"
-        df.to_csv(output_file, index=False)
-        print(f"\nSaved nodal PAC features to {output_file}")
+
+    subjects = get_subjects_with_blocks(epochs_dir, 'pac', blocks)
+    if not subjects:
+        legacy = sorted(epochs_dir.glob("*_pac_clean-epo.fif"))
+        subjects = sorted(set(f.stem.split("_")[0] for f in legacy))
+    if not subjects:
+        print("No PAC epoch files found.")
+        return
+
+    all_nodes = cfg.get('nodes', {})
+    regions = cfg.get('regions', {})
+
+    rf_chs = get_node_channels('RF', cfg)
+    rp_chs = get_node_channels('RP', cfg)
+    lf_chs = get_node_channels('LF', cfg)
+    lp_chs = get_node_channels('LP', cfg)
+
+    between_rows = []
+    local_rows = []
+
+    for subj in subjects:
+        print(f"\n{'='*50}")
+        print(f"  PAC Analysis: {subj}")
+        print(f"{'='*50}")
+
+        for block in blocks:
+            print(f"\n  --- Block {block} ---")
+            epochs = load_block_epochs(subj, block, 'pac', epochs_dir)
+
+            if epochs is None or 'eeg' not in epochs.get_channel_types():
+                print(f"  No data for block {block}")
+                continue
+
+            sfreq = epochs.info['sfreq']
+
+            # === 4a: Between-region PAC (H1) ===
+            rf_signal = get_node_signal(epochs, rf_chs)
+            rp_signal = get_node_signal(epochs, rp_chs)
+
+            between_row = {'subject': subj, 'block': block}
+
+            if rf_signal is not None and rp_signal is not None:
+                pac_between = compute_pac(rf_signal, rp_signal, sfreq, cfg)
+                between_row['pac_between_RF_RP'] = pac_between
+                print(f"  Between PAC (RF→RP): {pac_between:.3f}")
+            else:
+                between_row['pac_between_RF_RP'] = np.nan
+
+            # Exploratory: LF→LP
+            lf_signal = get_node_signal(epochs, lf_chs)
+            lp_signal = get_node_signal(epochs, lp_chs)
+            if lf_signal is not None and lp_signal is not None:
+                between_row['pac_between_LF_LP'] = compute_pac(lf_signal, lp_signal, sfreq, cfg)
+            else:
+                between_row['pac_between_LF_LP'] = np.nan
+
+            between_rows.append(between_row)
+
+            # === 4b: Local PAC per node (H3) ===
+            local_row = {'subject': subj, 'block': block}
+
+            for node_name, node_chs in all_nodes.items():
+                pac_local = compute_local_node_pac(epochs, node_chs, sfreq, cfg)
+                local_row[f'pac_{node_name}'] = pac_local
+                status = f"{pac_local:.3f}" if not np.isnan(pac_local) else "N/A"
+                print(f"  Local PAC {node_name}: {status}")
+
+            # Regional aggregation (3 regions)
+            for reg_name, reg_nodes in regions.items():
+                reg_vals = [local_row.get(f'pac_{n}', np.nan) for n in reg_nodes]
+                reg_vals = [v for v in reg_vals if not np.isnan(v)]
+                local_row[f'pac_{reg_name}'] = np.mean(reg_vals) if reg_vals else np.nan
+
+            local_rows.append(local_row)
+
+    # Save between-region PAC (H1)
+    if between_rows:
+        df_between = pd.DataFrame(between_rows)
+        out_between = OUTPUT_DIR / "pac_between_features.csv"
+        df_between.to_csv(out_between, index=False)
+        print(f"\nSaved between-region PAC (long format) to {out_between}")
+        print(df_between.to_string(index=False))
+
+    # Save local PAC (H3 + descriptive heatmap)
+    if local_rows:
+        df_local = pd.DataFrame(local_rows)
+        out_local = OUTPUT_DIR / "pac_local_features.csv"
+        df_local.to_csv(out_local, index=False)
+        print(f"\nSaved local PAC (long format) to {out_local}")
+        print(df_local.to_string(index=False))
 
 
 if __name__ == "__main__":

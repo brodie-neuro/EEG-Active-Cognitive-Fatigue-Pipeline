@@ -10,7 +10,7 @@ import numpy as np
 
 pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
-from src.utils_io import load_config
+from src.utils_io import load_config, subj_id_from_derivative
 
 
 def main():
@@ -31,7 +31,7 @@ def main():
         return
     
     for f in files:
-        subj = f.name.split("_")[0]
+        subj = subj_id_from_derivative(f)
         print(f"--- Processing {subj} (Epoching) ---")
         
         raw = mne.io.read_raw_fif(f, preload=True)
