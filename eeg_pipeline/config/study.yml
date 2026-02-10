@@ -51,7 +51,7 @@ nodes:
   CF: ['Fz', 'FCz', 'Cz']
   RF: ['F8', 'F4', 'FC6']
   LC: ['T7', 'C3', 'CP5']
-  C:  ['Cz', 'CPz']
+  CC: ['Cz', 'CPz']
   RC: ['T8', 'C4', 'CP6']
   LP: ['P7', 'P3', 'PO7']
   CP: ['Pz', 'POz']
@@ -60,7 +60,7 @@ nodes:
 # Regional aggregation (3 regions for inferential models)
 regions:
   Frontal: ['LF', 'CF', 'RF']
-  Central: ['LC', 'C', 'RC']
+  Central: ['LC', 'CC', 'RC']
   Parietal: ['LP', 'CP', 'RP']
 
 # Resting-state recordings (eyes-closed, ~3 min each)

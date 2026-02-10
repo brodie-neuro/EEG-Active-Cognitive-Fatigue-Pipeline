@@ -36,4 +36,13 @@ WAND_full_induction.py
 docs/old_analysis/
 docs/v2_plan_text.txt
 eeg_pipeline/analysis/removed/
+archive/
 eeg_pipeline/outputs/analysis_figures/
+eeg_pipeline/outputs/group_figures/
+
+# --- 7. Local development files ---
+ERRORS_AND_FIXES.md
+eeg_pipeline/outputs/logs/
+eeg_pipeline/outputs/qc/
+eeg_pipeline/outputs/reports/
+vis_log.txt

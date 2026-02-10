@@ -1,0 +1,156 @@
+{
+    "_description": "EEG Pipeline Parameters — Adjust these without editing scripts",
+    "_version": "1.0.0",
+    "filtering": {
+        "hp_freq": 0.1,
+        "lp_freq": 120.0,
+        "notch_freq": 50.0,
+        "notch_width": 2.0
+    },
+    "zapline": {
+        "n_harmonics": 4,
+        "chunk_length": 30
+    },
+    "ica": {
+        "n_components": 25,
+        "method": "infomax",
+        "random_state": 42,
+        "iclabel_thresholds": {
+            "eye": 0.80,
+            "heart": 0.80,
+            "muscle": 0.90,
+            "channel_noise": 0.95,
+            "line_noise": 0.95,
+            "other": 0.99
+        }
+    },
+    "asr": {
+        "cutoff": 20,
+        "method": "euclid",
+        "win_len": 0.5
+    },
+    "autoreject": {
+        "n_interpolate": [
+            1,
+            4,
+            8,
+            16
+        ],
+        "consensus": [
+            0.1,
+            0.5,
+            1.0
+        ],
+        "cv": 5,
+        "random_state": 42
+    },
+    "epoching": {
+        "p3b": {
+            "tmin": -0.2,
+            "tmax": 0.8,
+            "baseline": [
+                -0.2,
+                0.0
+            ]
+        },
+        "pac": {
+            "stim_duration_offset": 0.8,
+            "tmin": 0.0,
+            "tmax": 1.0,
+            "baseline": null
+        }
+    },
+    "p3b": {
+        "channels": [
+            "Pz"
+        ],
+        "tmin_peak": 0.300,
+        "tmax_peak": 0.500
+    },
+    "specparam": {
+        "freq_range": [
+            1,
+            30
+        ],
+        "peak_width_limits": [
+            1,
+            8
+        ],
+        "max_n_peaks": 6,
+        "min_peak_height": 0.1,
+        "aperiodic_mode": "fixed"
+    },
+    "band_power": {
+        "theta_default": [
+            4.0,
+            8.0
+        ],
+        "alpha_default": [
+            8.0,
+            13.0
+        ],
+        "individualized_bandwidth": 2.0,
+        "theta_cf_channels": [
+            "Fz",
+            "FCz",
+            "Cz"
+        ],
+        "alpha_posterior_channels": [
+            "Oz",
+            "O1",
+            "O2",
+            "POz",
+            "PO3",
+            "PO4"
+        ]
+    },
+    "pac": {
+        "phase_band": [
+            4,
+            8
+        ],
+        "amp_band": [
+            55,
+            85
+        ],
+        "n_surrogates": 200,
+        "trim": 0.10
+    },
+    "iaf": {
+        "channels": [
+            "Oz",
+            "O1",
+            "O2",
+            "POz",
+            "PO3",
+            "PO4",
+            "PO7",
+            "PO8"
+        ],
+        "search_range": [
+            6.0,
+            14.0
+        ],
+        "welch_win": 4.0
+    },
+    "itf": {
+        "channel": "Fz",
+        "search_range": [
+            3.0,
+            9.0
+        ]
+    },
+    "qc": {
+        "max_bad_channels_pct": 10,
+        "max_ica_components_rejected": 8,
+        "min_brain_ics_remaining": 15,
+        "max_asr_modified_pct": 30,
+        "max_epoch_rejection_pct": 30,
+        "min_epochs_per_condition": 20,
+        "p3b_latency_range_ms": [
+            250,
+            600
+        ],
+        "p3b_min_amplitude_uv": 0.5
+    }
+}

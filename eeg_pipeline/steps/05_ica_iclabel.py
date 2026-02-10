@@ -14,6 +14,8 @@ import numpy as np
 pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
 from src.utils_io import load_config, save_clean_raw, subj_id_from_derivative
+from src.utils_config import get_param
+from src.utils_report import QCReport
 
 
 def detect_flat_channels(raw, threshold=1e-10):
@@ -44,7 +46,20 @@ def main():
         print("No files found to process.")
         return
     
-    n_components = cfg["ica"]["n_components"]
+    n_components = get_param('ica', 'n_components', default=25)
+    ica_method = get_param('ica', 'method', default='infomax')
+    ica_seed = get_param('ica', 'random_state', default=42)
+    iclabel_thresholds = get_param('ica', 'iclabel_thresholds', default={})
+    
+    # Map ICLabel category names to our config keys
+    label_to_config = {
+        'eye blink': 'eye', 'eye': 'eye',
+        'heart beat': 'heart', 'heart': 'heart',
+        'muscle artifact': 'muscle', 'muscle': 'muscle',
+        'channel noise': 'channel_noise',
+        'line noise': 'line_noise',
+        'other': 'other',
+    }
     
     for f in files:
         subj = subj_id_from_derivative(f)
@@ -55,7 +70,7 @@ def main():
         # Skip ICA entirely for synthetic data (ICLabel needs pytorch/onnxruntime
         # and RANSAC-free synthetic data doesn't benefit from ICA anyway)
         if 'TEST' in subj.upper():
-            print("Synthetic data detected — skipping ICA, passing through.")
+            print("Synthetic data detected -- skipping ICA, passing through.")
             save_clean_raw(raw, output_dir, subj, "ica")
             continue
         
@@ -88,8 +103,9 @@ def main():
             continue
         
         # Fit ICA
-        print(f"Fitting ICA (n={actual_n_components} components on {n_good_channels} channels)...")
-        ica = ICA(n_components=actual_n_components, method="fastica", random_state=42, max_iter=500)
+        print(f"Fitting ICA (n={actual_n_components} components on {n_good_channels} channels, method={ica_method})...")
+        ica = ICA(n_components=actual_n_components, method=ica_method,
+                  random_state=ica_seed, max_iter=500)
         ica.fit(raw_ica_fit)
         
         # ICLabel classification
@@ -98,13 +114,16 @@ def main():
         labels = ic_labels["labels"]
         probs = ic_labels["y_pred_proba"]
         
-        # Identify artefacts (>80% probability of being non-brain)
+        # Identify artefacts using per-category thresholds from config
         exclude_idx = []
         print("\n--- Component Classification ---")
         for i, (label, prob) in enumerate(zip(labels, probs)):
             print(f"IC {i:02d}: {label} ({prob:.2f})")
-            if label in ["eye blink", "muscle", "heart", "channel noise"] and prob > 0.80:
+            config_key = label_to_config.get(label, 'other')
+            threshold = iclabel_thresholds.get(config_key, 0.80)
+            if label != 'brain' and prob > threshold:
                 exclude_idx.append(i)
+                print(f"  -> EXCLUDED (threshold: {threshold:.2f})")
                     
         print(f"\nMarked for exclusion: {exclude_idx}")
         ica.exclude = exclude_idx
@@ -121,10 +140,32 @@ def main():
             fig_src = ica.plot_sources(raw_ica_fit, picks=exclude_idx, show=False)
             fig_src.savefig(qc_dir / f"{subj}_ica_excluded_time.png")
 
-        # Apply ICA to original data (including bad channels, which are untouched)
+        # Apply ICA to original data
         print("Applying ICA to original data...")
         raw_clean = raw.copy()
         ica.apply(raw_clean, exclude=exclude_idx)
+        
+        # QC report
+        block_str = ''.join(c for c in f.stem if c.isdigit())
+        block_num = int(block_str[-1]) if block_str else 1
+        qc = QCReport(subj, block_num)
+        
+        n_brain = sum(1 for l in labels if l == 'brain')
+        status = qc.assess_metric('ICs rejected', len(exclude_idx),
+                                  'max_ica_components_rejected', '<=')
+        if n_brain < get_param('qc', 'min_brain_ics_remaining', default=15):
+            status = 'WARNING'
+        
+        qc.log_step('05_ica', status=status,
+                     metrics={
+                         'n_components_fit': actual_n_components,
+                         'n_excluded': len(exclude_idx),
+                         'n_brain_remaining': n_brain,
+                         'excluded_indices': str(exclude_idx),
+                     },
+                     params_used={'method': ica_method, 'n_components': n_components,
+                                  'thresholds': iclabel_thresholds})
+        qc.save_report()
         
         save_clean_raw(raw_clean, output_dir, subj, "ica")
         print(f"Saved {subj} ICA cleaned data.\n")

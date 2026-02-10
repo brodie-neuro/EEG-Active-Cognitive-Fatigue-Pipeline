@@ -1,10 +1,10 @@
 # eeg_pipeline/analysis/10_erp_p3b.py
 """
-Step 1 — P3b ERP Analysis (H5)
+Step 1 -- P3b ERP Analysis (H5)
 
 Extracts P3b amplitude (300-500 ms) and peak latency from target trials
 at centroparietal electrodes (CP node). Outputs long format:
-one row per subject × block.
+one row per subject x block.
 
 Reference: post_processing_EEG_plan_v2.docx, Step 1
 """
@@ -21,14 +21,16 @@ from src.utils_io import load_config
 from src.utils_features import (
     load_block_epochs, get_subjects_with_blocks, available_channels
 )
+from src.utils_config import get_param
 
 OUTPUT_DIR = pipeline_dir / "outputs" / "features"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-# P3b parameters
-P3B_TMIN = 0.300  # 300 ms
-P3B_TMAX = 0.500  # 500 ms
-P3B_CHANNELS = ['Pz', 'CPz', 'POz']  # CP node electrodes
+# P3b parameters from config
+_p3b_cfg = get_param('p3b', default={})
+P3B_TMIN = _p3b_cfg.get('tmin_peak', 0.300)
+P3B_TMAX = _p3b_cfg.get('tmax_peak', 0.500)
+P3B_CHANNELS = _p3b_cfg.get('channels', ['Pz'])
 
 
 def extract_p3b(epochs, ch_picks=None):
@@ -62,7 +64,7 @@ def extract_p3b(epochs, ch_picks=None):
     # Grand average ERP (mean across epochs, then across channels)
     erp = data.mean(axis=0).mean(axis=0)  # (n_times,)
 
-    # Mean amplitude in P3b window (in µV)
+    # Mean amplitude in P3b window (in uV)
     p3b_amp = erp[t_mask].mean() * 1e6
 
     # Peak latency (in ms)
@@ -125,7 +127,7 @@ def main():
                 'p3b_amp_uV': p3b['p3b_amplitude_uV'],
                 'p3b_lat_ms': p3b['p3b_latency_ms'],
             })
-            print(f"  Block {block}: amp={p3b['p3b_amplitude_uV']:.2f} µV, "
+            print(f"  Block {block}: amp={p3b['p3b_amplitude_uV']:.2f} uV, "
                   f"lat={p3b['p3b_latency_ms']:.0f} ms")
 
     if rows:

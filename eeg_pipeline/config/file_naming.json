@@ -1,0 +1,45 @@
+{
+    "_description": "Central file naming config. All scripts reference this file so you can rename inputs/outputs in one place.",
+    "_note": "Change any value here and all scripts that use it will update automatically.",
+    "raw_data": {
+        "pattern": "sub-*_block*.vhdr",
+        "description": "BrainVision raw EEG files",
+        "examples": [
+            "sub-001_block1.vhdr",
+            "sub-001_block5.vhdr"
+        ]
+    },
+    "resting_state": {
+        "pre_pattern": "sub-{subject}_rest-pre.vhdr",
+        "post_pattern": "sub-{subject}_rest-post.vhdr",
+        "description": "Eyes-closed resting state recordings (3 min each)"
+    },
+    "derivatives": {
+        "imported": "{subject}_block{block}_raw.fif",
+        "referenced": "{subject}_block{block}_ref-raw.fif",
+        "zaplined": "{subject}_block{block}_zapline-raw.fif",
+        "ica_cleaned": "{subject}_block{block}_ica-raw.fif",
+        "asr_cleaned": "{subject}_block{block}_asr-raw.fif",
+        "p3b_epochs": "{subject}_block{block}_p3b-epo.fif",
+        "pac_epochs": "{subject}_block{block}_pac-epo.fif",
+        "epochs_clean": "{subject}_block{block}_{type}_clean-epo.fif"
+    },
+    "features": {
+        "iaf": "iaf_features.csv",
+        "theta_freq": "theta_freq_features.csv",
+        "theta_power": "theta_power_features.csv",
+        "alpha_power": "alpha_power_features.csv",
+        "p3b": "p3b_features.csv",
+        "pac_between": "pac_between_features.csv",
+        "pac_local": "pac_local_features.csv",
+        "pac_heatmap": "pac_9node_features.csv",
+        "merged": "merged_wide.csv"
+    },
+    "figures": {
+        "psd_specparam": "psd_specparam_overlay.png",
+        "pac_montage": "pac_local_montage.png",
+        "pac_between": "pac_between_montage.png",
+        "p3b_erp": "p3b_erp_filtered.png",
+        "iaf_comparison": "iaf_pre_post_comparison.png"
+    }
+}

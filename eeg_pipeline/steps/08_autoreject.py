@@ -10,6 +10,8 @@ import mne
 pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
 from src.utils_io import load_config, subj_id_from_derivative
+from src.utils_config import get_param
+from src.utils_report import QCReport, qc_epoch_summary
 
 try:
     from autoreject import AutoReject, get_rejection_threshold
@@ -44,9 +46,9 @@ def main():
             epochs = mne.read_epochs(f, preload=True)
             n_before = len(epochs)
             
-            # Synthetic data bypass — autoreject can hang or over-reject
+            # Synthetic data bypass -- autoreject can hang or over-reject
             if 'TEST' in subj.upper():
-                print("Synthetic data — skipping autoreject, saving unchanged.")
+                print("Synthetic data -- skipping autoreject, saving unchanged.")
                 epochs.save(output_dir / f"{subj}_{epoch_type}_clean-epo.fif", overwrite=True)
                 continue
             
@@ -66,9 +68,16 @@ def main():
                 epochs.save(output_dir / f"{subj}_{epoch_type}_clean-epo.fif", overwrite=True)
                 continue
             
-            # Run Autoreject
+            # Run Autoreject with config parameters
+            ar_params = get_param('autoreject')
             print(f"Running Autoreject on {n_before} epochs...")
-            ar = AutoReject(n_interpolate=[1, 2, 4], random_state=42, n_jobs=-1, verbose=False)
+            ar = AutoReject(
+                n_interpolate=ar_params.get('n_interpolate', [1, 4, 8, 16]),
+                consensus=ar_params.get('consensus', [0.1, 0.5, 1.0]),
+                cv=ar_params.get('cv', 5),
+                random_state=ar_params.get('random_state', 42),
+                n_jobs=-1, verbose=False
+            )
             epochs_clean, reject_log = ar.fit_transform(epochs, return_log=True)
             
             n_after = len(epochs_clean)
@@ -84,6 +93,37 @@ def main():
                 print(f"  Could not save reject log: {e}")
             
             epochs_clean.save(output_dir / f"{subj}_{epoch_type}_clean-epo.fif", overwrite=True)
+            
+            # QC report
+            block_str = ''.join(c for c in f.stem if c.isdigit())
+            block_num = int(block_str[-1]) if block_str else 1
+            qc = QCReport(subj, block_num)
+            
+            reject_pct = 100 * n_rejected / n_before if n_before > 0 else 0
+            status = qc.assess_metric('Epoch rejection', reject_pct,
+                                      'max_epoch_rejection_pct', '<=')
+            
+            # Save epoch QC figure
+            try:
+                fig, metrics = qc_epoch_summary(
+                    epochs_clean,
+                    title=f"{subj} {epoch_type} ({n_after}/{n_before} kept)"
+                )
+                qc.add_figure(f'08_autoreject_{epoch_type}', fig)
+            except Exception as e:
+                print(f"  Could not save epoch QC figure: {e}")
+                metrics = {}
+            
+            qc.log_step(f'08_autoreject_{epoch_type}', status=status,
+                         metrics={
+                             'n_before': n_before,
+                             'n_after': n_after,
+                             'n_rejected': n_rejected,
+                             'rejection_pct': round(reject_pct, 1),
+                             **metrics,
+                         },
+                         params_used=ar_params)
+            qc.save_report()
             print(f"  Saved clean epochs for {subj}.\n")
 
 

@@ -43,12 +43,12 @@ def main():
         # It already has the correct channel types (EEG vs EMG) set
         raw = read_raw(f, fmt="fif", montage=cfg['montage'])
 
-        # Detect synthetic data — skip RANSAC (destroys spatially
+        # Detect synthetic data -- skip RANSAC (destroys spatially
         # uncorrelated fake signals) and use simple average reference
         is_synthetic = 'TEST' in subj.upper()
 
         if is_synthetic:
-            print("Synthetic data detected — using simple average reference")
+            print("Synthetic data detected -- using simple average reference")
             raw_ref = raw.copy().set_eeg_reference('average', projection=False)
             bads = []
         else:

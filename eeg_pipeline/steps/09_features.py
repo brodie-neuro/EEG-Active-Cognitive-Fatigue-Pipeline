@@ -27,7 +27,7 @@ def extract_p3b_features(epochs, ch_name='Pz'):
     
     # Mean amplitude across trials
     erp = data.mean(axis=0).squeeze()  # Average across epochs
-    p3b_amp = erp[t_mask].mean() * 1e6  # Convert to µV
+    p3b_amp = erp[t_mask].mean() * 1e6  # Convert to uV
     
     # Peak latency
     peak_idx = np.argmax(erp[t_mask])

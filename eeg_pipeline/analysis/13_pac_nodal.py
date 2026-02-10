@@ -1,14 +1,14 @@
 # eeg_pipeline/analysis/13_pac_nodal.py
 """
-Step 4 — Phase-Amplitude Coupling Analysis (H1, H3)
+Step 4 -- Phase-Amplitude Coupling Analysis (H1, H3)
 
-4a (H1): Between-region PAC — RF theta phase × RP gamma amplitude
-4b (H3): Local PAC — within-node, collapsed to 3 regions (F, C, P)
-4c: Descriptive 9-node ΔPAC heatmap data
+4a (H1): Between-region PAC -- RF theta phase x RP gamma amplitude
+4b (H3): Local PAC -- within-node, collapsed to 3 regions (F, C, P)
+4c: Descriptive 9-node delta-PAC heatmap data
 
 Uses tensorpac for PAC computation with surrogate z-scoring.
 Modulation Index (Tort et al., 2010) as the core metric.
-Outputs long format: one row per subject × block.
+Outputs long format: one row per subject x block.
 
 Reference: post_processing_EEG_plan_v2.docx, Step 4
 """
@@ -259,10 +259,12 @@ def main():
                 high = min(upper_cap, itf + 2.0)
                 individual_band = [low, high]
                 
-                pac_cfg['pac']['phase_band'] = individual_band
-                
-                print(f"  Individual Theta Band: {low:.1f}-{high:.1f} Hz "
-                      f"(Peak: {itf:.2f}, IAF cap: {upper_cap:.1f})")
+                if low >= high:
+                    print(f"  WARNING: band inverted ({low:.1f}>={high:.1f}), using config default")
+                else:
+                    pac_cfg['pac']['phase_band'] = individual_band
+                    print(f"  Individual Theta Band: {low:.1f}-{high:.1f} Hz "
+                          f"(Peak: {itf:.2f}, IAF cap: {upper_cap:.1f})")
             else:
                 print(f"  Config Theta Band: {fixed_band[0]}-{fixed_band[1]} Hz (no individual peak)")
 
@@ -275,11 +277,11 @@ def main():
             if rf_signal is not None and rp_signal is not None:
                 pac_between = compute_pac(rf_signal, rp_signal, sfreq, pac_cfg)
                 between_row['pac_between_RF_RP'] = pac_between
-                print(f"  Between PAC (RF→RP): {pac_between:.3f}")
+                print(f"  Between PAC (RF->RP): {pac_between:.3f}")
             else:
                 between_row['pac_between_RF_RP'] = np.nan
 
-            # Exploratory: LF→LP
+            # Exploratory: LF->LP
             lf_signal = get_node_signal(epochs, lf_chs)
             lp_signal = get_node_signal(epochs, lp_chs)
             if lf_signal is not None and lp_signal is not None:

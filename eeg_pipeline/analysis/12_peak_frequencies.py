@@ -1,12 +1,12 @@
 # eeg_pipeline/analysis/12_peak_frequencies.py
 """
-Steps 2 & 3 — IAF (H6) and Theta Peak Frequency (H2) via specparam
+Steps 2 & 3 -- IAF (H6) and Theta Peak Frequency (H2) via specparam
 
 Step 2: Individual Alpha Frequency from resting-state posterior electrodes.
 Step 3: Task-related theta peak frequency from CF node during maintenance.
 
 Both use specparam to separate periodic from aperiodic components.
-Outputs long format: one row per subject × block.
+Outputs long format: one row per subject x block.
 
 Reference: post_processing_EEG_plan_v2.docx, Steps 2 & 3
 """
@@ -24,6 +24,7 @@ from src.utils_features import (
     load_block_epochs, get_subjects_with_blocks,
     available_channels, get_node_channels
 )
+from src.utils_config import get_param
 
 try:
     from specparam import SpectralModel
@@ -44,7 +45,7 @@ def extract_peak_frequency(psd_data, freqs, freq_range, cfg):
     -------
     dict with 'peak_freq', 'peak_power', 'aperiodic_exponent'
     """
-    sp_cfg = cfg.get('specparam', {})
+    sp_cfg = get_param('specparam', default={})
     freq_fit_range = sp_cfg.get('freq_range', [1, 30])
 
     sm = SpectralModel(
@@ -170,7 +171,7 @@ def main():
         print("No epoch files found.")
         return
 
-    # --- Theta frequency: long format (subject × block) ---
+    # --- Theta frequency: long format (subject x block) ---
     theta_rows = []
 
     for subj in subjects:
@@ -189,9 +190,9 @@ def main():
                 'aperiodic_exp': aperiodic_exp,
             })
             if not np.isnan(f_theta):
-                print(f"  Block {block}: fθ={f_theta:.2f} Hz, aperiodic={aperiodic_exp:.3f}")
+                print(f"  Block {block}: f_theta={f_theta:.2f} Hz, aperiodic={aperiodic_exp:.3f}")
             else:
-                print(f"  Block {block}: fθ N/A")
+                print(f"  Block {block}: f_theta N/A")
 
     if theta_rows:
         df_theta = pd.DataFrame(theta_rows)

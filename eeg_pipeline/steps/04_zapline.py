@@ -12,6 +12,8 @@ from meegkit.dss import dss_line
 pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
 from src.utils_io import load_config, save_clean_raw, subj_id_from_derivative
+from src.utils_config import get_param
+from src.utils_report import QCReport, qc_psd_overlay
 
 
 def main():
@@ -33,8 +35,12 @@ def main():
         print("No files found to process.")
         return
     
-    fline = 50.0  # Line frequency (Hz)
-    nremove = 1   # Number of components to remove
+    # Read parameters from config
+    zap_params = get_param('zapline')
+    filt_params = get_param('filtering')
+    fline = filt_params.get('notch_freq', 50.0)
+    n_harmonics = zap_params.get('n_harmonics', 4)
+    nremove = 1   # DSS components to remove per harmonic
     
     for f in files:
         subj = subj_id_from_derivative(f)
@@ -42,6 +48,11 @@ def main():
         
         raw = mne.io.read_raw_fif(f, preload=True)
         sfreq = raw.info["sfreq"]
+        
+        # Extract block number from filename for QC report
+        block_str = ''.join(c for c in f.stem if c.isdigit())
+        block_num = int(block_str[-1]) if block_str else 1
+        qc = QCReport(subj, block_num)
         
         # Get EEG data in microvolts for numerical stability
         data = raw.get_data(picks="eeg") * 1e6
@@ -55,10 +66,14 @@ def main():
                 
             out, _ = dss_line(data.T, fline=fline, sfreq=sfreq, nremove=nremove)
             
-            # Remove 100Hz harmonic if sampling rate allows
-            if sfreq > 200:
-                print("Removing 100Hz harmonic...")
-                out, _ = dss_line(out, fline=100.0, sfreq=sfreq, nremove=nremove)
+            # Remove harmonics as configured
+            harmonics_removed = [fline]
+            for h in range(2, n_harmonics + 1):
+                harmonic_freq = fline * h
+                if harmonic_freq < sfreq / 2:  # Below Nyquist
+                    print(f"Removing {harmonic_freq:.0f}Hz harmonic...")
+                    out, _ = dss_line(out, fline=harmonic_freq, sfreq=sfreq, nremove=nremove)
+                    harmonics_removed.append(harmonic_freq)
             
             # Put cleaned data back into Raw object
             raw_zap = raw.copy()
@@ -68,19 +83,23 @@ def main():
         except Exception as e:
             print(f"Zapline failed: {e}")
             print("Falling back to MNE notch filter...")
-            raw_zap = raw.copy().notch_filter(freqs=[50, 100], method='fir', n_jobs=-1, verbose=False)
+            notch_freqs = [fline * h for h in range(1, n_harmonics + 1) if fline * h < sfreq / 2]
+            raw_zap = raw.copy().notch_filter(freqs=notch_freqs, method='fir', n_jobs=-1, verbose=False)
         
         # Save QC plot comparing before/after
         try:
-            fig = raw.compute_psd(fmin=1, fmax=120).plot(show=False)
-            fig.axes[0].set_title(f"{subj} - Before (blue) vs After (red)")
-            raw_zap.compute_psd(fmin=1, fmax=120).plot(axes=fig.axes[0], color='r', show=False)
-            fig.savefig(qc_dir / f"{subj}_zapline_psd.png")
-            print(f"Saved QC plot to {qc_dir}")
+            fig = qc_psd_overlay(raw, raw_zap, f"{subj} - ZapLine PSD (Before/After)")
+            qc.add_figure('04_zapline_psd', fig)
         except Exception as e:
             print(f"Could not generate QC plot: {e}")
         
+        # Log QC step
+        qc.log_step('04_zapline', status='PASS',
+                     metrics={'line_freq': fline, 'n_harmonics': n_harmonics},
+                     params_used=zap_params)
+        
         save_clean_raw(raw_zap, output_dir, subj, "zapline")
+        qc.save_report()
         print(f"Saved {subj} zapline data.\n")
 
 

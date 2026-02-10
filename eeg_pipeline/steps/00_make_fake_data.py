@@ -191,7 +191,7 @@ def generate_block(block_num, rng):
                                              phase=float(rng.uniform(0, 2 * np.pi)))
 
     # Tonic high gamma (broadband, low amplitude)
-    # Present across cortex but strongest parietal — provides baseline
+    # Present across cortex but strongest parietal -- provides baseline
     # for PAC amplitude extraction and realistic PSD shape
     gamma_scale = 0.85 if is_fatigued else 1.0  # Slight reduction with fatigue
     for ch in eeg_names:
@@ -263,7 +263,7 @@ def generate_block(block_num, rng):
     rp_chs = [c for c in ["P8", "P4", "PO8"] if c in eeg_names]
 
     for tr, t0 in enumerate(onsets_stim):
-        # Maintenance window: 800–1800 ms post-stimulus
+        # Maintenance window: 800-1800 ms post-stimulus
         maint_start = t0 + 0.8
         maint_end = t0 + 1.8
         i_start = int(maint_start * SFREQ)
@@ -339,6 +339,8 @@ def generate_block(block_num, rng):
             continue
         i1 = min(i0 + burst_len, n_samp)
         seg_len = i1 - i0
+        if seg_len <= 0:
+            continue
         burst_carrier_l = band_noise(60.0, 120.0, amp=1.0)[:seg_len]
         burst_carrier_r = band_noise(60.0, 120.0, amp=1.0)[:seg_len]
         amp = float(rng.uniform(4e-6, 9e-6))
@@ -359,7 +361,7 @@ def generate_block(block_num, rng):
     stim_desc = np.where(is_target, "stim/target", "stim/nontarget")
     ann = mne.Annotations(onsets_stim, [STIM_DUR] * n_trials, list(stim_desc))
 
-    # Stimulus offset (Trigger 2) — marks start of maintenance window
+    # Stimulus offset (Trigger 2) -- marks start of maintenance window
     valid_offset = onsets_stim_offset < DURATION_S
     ann += mne.Annotations(
         onsets_stim_offset[valid_offset],
@@ -408,4 +410,4 @@ if __name__ == "__main__":
               f"| misses: {int(is_miss.sum())} | errors: {int(is_error.sum())}")
         print(f"EEG channels: {len(eeg_names)} | total channels incl aux: {len(ch_names)}")
 
-    print(f"\nDone — Block 1 and Block 5 synthetic data written to {out_dir}")
+    print(f"\nDone -- Block 1 and Block 5 synthetic data written to {out_dir}")

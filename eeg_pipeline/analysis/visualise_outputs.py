@@ -23,7 +23,19 @@ FEATURES_DIR = pipeline_dir / "outputs" / "features"
 EPOCHS_DIR = pipeline_dir / "outputs" / "derivatives" / "epochs_clean"
 
 
-# ─── Scalp node positions (2D projection) ───────────────────────────
+def _discover_subject():
+    """Find first available subject from clean epoch files."""
+    for pat in ['*_pac_clean-epo.fif', '*_p3b_clean-epo.fif']:
+        files = sorted(EPOCHS_DIR.glob(pat))
+        if files:
+            # Extract subject ID: sub-XXX from sub-XXX_blockN_type_clean-epo.fif
+            stem = files[0].stem
+            parts = stem.split('_block')
+            if parts:
+                return parts[0]
+    return None
+
+# --- Scalp node positions (2D projection) ---------------------------
 # 9 canonical regions on a standard head circle
 NODE_POSITIONS = {
     'LF': (-0.30,  0.35),   # Left Frontal
@@ -69,7 +81,7 @@ def draw_head(ax, linewidth=1.5):
 
 
 def plot_pac_montage():
-    """PAC values on a scalp montage — 3 panels: B1, B5, ΔPAC."""
+    """PAC values on a scalp montage -- 3 panels: B1, B5, delta PAC."""
     df = pd.read_csv(FEATURES_DIR / "pac_local_features.csv")
 
     nodes = ['LF', 'CF', 'RF', 'LC', 'CC', 'RC', 'LP', 'CP', 'RP']
@@ -99,7 +111,7 @@ def plot_pac_montage():
 
     for ax, vals, title in zip(axes,
                                 [b1_vals, b5_vals, delta],
-                                ['Block 1 (Baseline)', 'Block 5 (Fatigued)', 'ΔPAC (B5 − B1)']):
+                                ['Block 1 (Baseline)', 'Block 5 (Fatigued)', 'dPAC (B5 - B1)']):
         draw_head(ax)
 
         xs = [NODE_POSITIONS[n][0] for n in avail_nodes]
@@ -117,7 +129,7 @@ def plot_pac_montage():
         ax.set_title(title, fontsize=13, fontweight='bold', pad=15)
         plt.colorbar(sc, ax=ax, fraction=0.046, pad=0.02, label='PAC (MI)')
 
-    fig.suptitle('Local Theta–Gamma PAC — Scalp Montage', fontsize=15, fontweight='bold', y=1.02)
+    fig.suptitle('Local Theta-Gamma PAC -- Scalp Montage', fontsize=15, fontweight='bold', y=1.02)
     fig.tight_layout()
     fig.savefig(OUTPUT_DIR / "pac_montage.png", dpi=150, bbox_inches='tight')
     print("Saved PAC scalp montage")
@@ -137,12 +149,12 @@ def plot_between_pac_montage():
 
         draw_head(ax)
 
-        row = df[df['block'] == block]
-        if len(row) == 0:
+        rows = df[df['block'] == block]
+        if len(rows) == 0:
             ax.set_title(f'{title}\nNo data')
             continue
 
-        pac_val = row['pac_between_RF_RP'].values[0]
+        pac_val = rows['pac_between_RF_RP'].mean()
 
         # Plot all 9 nodes
         for node, (x, y) in NODE_POSITIONS.items():
@@ -200,9 +212,9 @@ def plot_between_pac_montage():
     # Legend
     legend_elements = [
         plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='#4CAF50', 
-                   markersize=10, label='Source: RF (θ phase)'),
+                   markersize=10, label='Source: RF (theta phase)'),
         plt.Line2D([0], [0], marker='o', color='w', markerfacecolor='#FF9800', 
-                   markersize=10, label='Target: RP (γ amp)'),
+                   markersize=10, label='Target: RP (gamma amp)'),
     ]
     axes[0].legend(handles=legend_elements, loc='upper left', fontsize=9, frameon=True)
 
@@ -224,10 +236,15 @@ def plot_psd_specparam():
     colors = {1: '#2196F3', 5: '#F44336'}
     labels = {1: 'Block 1 (Baseline)', 5: 'Block 5 (Fatigued)'}
 
+    subj = _discover_subject()
+    if not subj:
+        print("No epoch files found for PSD plot")
+        return
+
     # --- Theta range (left panel) ---
     ax = axes[0]
     for block in [1, 5]:
-        fname = EPOCHS_DIR / f"sub-TEST01_block{block}_pac_clean-epo.fif"
+        fname = EPOCHS_DIR / f"{subj}_block{block}_pac_clean-epo.fif"
         if not fname.exists():
             continue
 
@@ -240,7 +257,7 @@ def plot_psd_specparam():
         psd = epochs.copy().pick(picks).compute_psd(
             method='welch', fmin=1, fmax=30, n_fft=256, verbose=False)
         freqs = psd.freqs
-        psds = psd.get_data().mean(axis=(0, 1)) * 1e12  # µV²/Hz
+        psds = psd.get_data().mean(axis=(0, 1)) * 1e12  # uV^2/Hz
 
         ax.semilogy(freqs, psds, color=colors[block], linewidth=2,
                    label=labels[block], alpha=0.8)
@@ -249,16 +266,16 @@ def plot_psd_specparam():
         sm = SpectralModel(peak_width_limits=[1, 8], max_n_peaks=6,
                           min_peak_height=0.1, aperiodic_mode='fixed', verbose=False)
         try:
-            sm.fit(freqs, np.log10(psds), [1, 30])
-            model_fit = 10 ** sm.modeled_spectrum_
+            sm.fit(freqs, psds, [1, 30])
+            model_fit = sm.modeled_spectrum_
             ax.semilogy(freqs, model_fit, color=colors[block], linewidth=1.5,
                        linestyle='--', alpha=0.6)
         except Exception:
             pass
 
-    ax.axvspan(4, 8, alpha=0.1, color='green', label='θ band (4–8 Hz)')
+    ax.axvspan(4, 8, alpha=0.1, color='green', label='theta band (4-8 Hz)')
     ax.set_xlabel('Frequency (Hz)', fontsize=12)
-    ax.set_ylabel('Power (µV²/Hz)', fontsize=12)
+    ax.set_ylabel('Power (uV^2/Hz)', fontsize=12)
     ax.set_title('PSD + Specparam Fit: Frontal Midline', fontsize=13, fontweight='bold')
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)
@@ -266,7 +283,7 @@ def plot_psd_specparam():
     # --- Alpha range (right panel) ---
     ax = axes[1]
     for block in [1, 5]:
-        fname = EPOCHS_DIR / f"sub-TEST01_block{block}_pac_clean-epo.fif"
+        fname = EPOCHS_DIR / f"{subj}_block{block}_pac_clean-epo.fif"
         if not fname.exists():
             continue
 
@@ -286,8 +303,8 @@ def plot_psd_specparam():
         sm = SpectralModel(peak_width_limits=[1, 8], max_n_peaks=6,
                           min_peak_height=0.1, aperiodic_mode='fixed', verbose=False)
         try:
-            sm.fit(freqs, np.log10(psds), [1, 30])
-            model_fit = 10 ** sm.modeled_spectrum_
+            sm.fit(freqs, psds, [1, 30])
+            model_fit = sm.modeled_spectrum_
             ax.semilogy(freqs, model_fit, color=colors[block], linewidth=1.5,
                        linestyle='--', alpha=0.6)
         except Exception:
@@ -317,11 +334,11 @@ def plot_psd_specparam():
             theta_hi = min(alpha_lo, mean_itf + 2.0)  # cap at alpha start
     
     ax.axvspan(theta_lo, theta_hi, alpha=0.08, color='blue',
-               label=f'θ band ({theta_lo:.0f}–{theta_hi:.0f} Hz)')
+               label=f'theta band ({theta_lo:.0f}-{theta_hi:.0f} Hz)')
     ax.axvspan(alpha_lo, alpha_hi, alpha=0.08, color='purple',
-               label=f'α band ({alpha_lo:.0f}–{alpha_hi:.0f} Hz)')
+               label=f'alpha band ({alpha_lo:.0f}-{alpha_hi:.0f} Hz)')
     ax.set_xlabel('Frequency (Hz)', fontsize=12)
-    ax.set_ylabel('Power (µV²/Hz)', fontsize=12)
+    ax.set_ylabel('Power (uV^2/Hz)', fontsize=12)
     ax.set_title('PSD + Specparam Fit: Posterior (IAF)', fontsize=13, fontweight='bold')
     ax.legend(fontsize=9)
     ax.grid(True, alpha=0.3)
@@ -339,20 +356,25 @@ def plot_p3b_erp_filtered():
     colors = {'1': '#2196F3', '5': '#F44336'}
     labels = {'1': 'Block 1 (Baseline)', '5': 'Block 5 (Fatigued)'}
 
+    subj = _discover_subject()
+    if not subj:
+        print("No epoch files found for P3b plot")
+        return
+
     for block in [1, 5]:
-        fname = EPOCHS_DIR / f"sub-TEST01_block{block}_p3b_clean-epo.fif"
+        fname = EPOCHS_DIR / f"{subj}_block{block}_p3b_clean-epo.fif"
         if not fname.exists():
             continue
 
         epochs = mne.read_epochs(str(fname), verbose=False)
-        picks = [ch for ch in ['Pz', 'CPz', 'POz', 'P1', 'P2'] if ch in epochs.ch_names]
+        picks = [ch for ch in ['Pz'] if ch in epochs.ch_names]
         if not picks:
-            picks = epochs.ch_names[:5]
+            picks = ['CPz'] if 'CPz' in epochs.ch_names else epochs.ch_names[:1]
 
         # Apply 20Hz low-pass filter for visualization smoothing
         epochs_plot = epochs.copy().filter(l_freq=None, h_freq=20.0, n_jobs=-1, verbose=False)
         data = epochs_plot.pick(picks).get_data()
-        erp = data.mean(axis=0).mean(axis=0) * 1e6  # µV
+        erp = data.mean(axis=0).mean(axis=0) * 1e6  # uV
         times = epochs.times * 1000  # ms
 
         ax.plot(times, erp, color=colors[str(block)], linewidth=2,
@@ -364,7 +386,7 @@ def plot_p3b_erp_filtered():
     ax.axvline(0, color='gray', linewidth=0.5, linestyle='--')
 
     ax.set_xlabel('Time (ms)', fontsize=12)
-    ax.set_ylabel('Amplitude (µV)', fontsize=12)
+    ax.set_ylabel('Amplitude (uV)', fontsize=12)
     ax.set_title('P3b ERP (20Hz LP)', fontsize=14, fontweight='bold')
     ax.legend(fontsize=11)
     ax.set_xlim(-200, 800)
@@ -379,14 +401,14 @@ def plot_iaf_comparison():
     """Plot IAF comparison: Pre vs Post fatigue resting-state.
     
     Shows specparam-extracted alpha peaks with Gaussian bandwidth,
-    and paired t-test results. No mixed models needed — just two
+    and paired t-test results. No mixed models needed -- just two
     resting-state timepoints.
     """
     from scipy.stats import ttest_rel
     
     iaf_file = FEATURES_DIR / "iaf_features.csv"
     if not iaf_file.exists():
-        print("No IAF features found — skipping IAF comparison plot.")
+        print("No IAF features found -- skipping IAF comparison plot.")
         return
 
     df = pd.read_csv(iaf_file)
@@ -395,7 +417,7 @@ def plot_iaf_comparison():
     post = df[df['timepoint'] == 'post'].dropna(subset=['iaf'])
     
     if len(pre) == 0 or len(post) == 0:
-        print("Insufficient IAF data for comparison — skipping.")
+        print("Insufficient IAF data for comparison -- skipping.")
         return
 
     fig, axes = plt.subplots(1, 3, figsize=(16, 5))

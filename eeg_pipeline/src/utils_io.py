@@ -65,8 +65,8 @@ def subject_id_from_path(p):
     """
     Extract subject+block identifier from filename.
 
-    e.g. 'sub-TEST01_block1-task.vhdr' → 'sub-TEST01_block1'
-         'sub-TEST01.vhdr'             → 'sub-TEST01'
+    e.g. 'sub-TEST01_block1-task.vhdr' -> 'sub-TEST01_block1'
+         'sub-TEST01.vhdr'             -> 'sub-TEST01'
     """
     base = Path(p).stem              # 'sub-TEST01_block1-task'
     # Strip the task suffix (everything after last hyphen if it's a task label)
@@ -82,9 +82,9 @@ def subj_id_from_derivative(fif_path):
     """
     Extract subject+block identifier from a derivative .fif filename.
 
-    e.g. 'sub-TEST01_block1_cleaned-raw.fif' → 'sub-TEST01_block1'
-         'sub-TEST01_block5_ica-raw.fif'     → 'sub-TEST01_block5'
-         'sub-TEST01_cleaned-raw.fif'        → 'sub-TEST01'
+    e.g. 'sub-TEST01_block1_cleaned-raw.fif' -> 'sub-TEST01_block1'
+         'sub-TEST01_block5_ica-raw.fif'     -> 'sub-TEST01_block5'
+         'sub-TEST01_cleaned-raw.fif'        -> 'sub-TEST01'
 
     Strips the processing suffix (e.g. '_cleaned-raw', '_ica-raw', '_asr-raw').
     """
