@@ -13,6 +13,7 @@ Outputs long format: one row per subject × block.
 Reference: post_processing_EEG_plan_v2.docx, Step 4
 """
 import sys
+import copy
 from pathlib import Path
 import mne
 import numpy as np
@@ -161,16 +162,53 @@ def compute_local_node_pac(epochs, node_channels, sfreq, cfg):
         return np.mean(electrode_pacs)
 
 
+def load_individual_peaks(output_dir):
+    """Load individual theta (ITF) and alpha (IAF) peak frequencies.
+    
+    Returns
+    -------
+    itf_map : dict  {(subject, block): f_theta}
+    iaf_map : dict  {(subject, timepoint): iaf}
+    """
+    itf_map = {}
+    feat_file = output_dir / "theta_freq_features.csv"
+    if feat_file.exists():
+        df = pd.read_csv(feat_file)
+        itf_map = {(row['subject'], row['block']): row['f_theta']
+                   for _, row in df.iterrows() if not np.isnan(row['f_theta'])}
+
+    iaf_map = {}
+    iaf_file = output_dir / "iaf_features.csv"
+    if iaf_file.exists():
+        df = pd.read_csv(iaf_file)
+        iaf_map = {row['subject']: row['iaf']
+                   for _, row in df.iterrows()
+                   if not np.isnan(row['iaf']) and row['timepoint'] == 'pre'}
+
+    return itf_map, iaf_map
+
+
 def main():
     cfg = load_config()
     blocks = cfg.get('blocks', [1, 5])
     epochs_dir = pipeline_dir / "outputs" / "derivatives" / "epochs_clean"
+    features_dir = pipeline_dir / "outputs" / "features"
 
     if not epochs_dir.exists():
         print(f"Epochs directory not found: {epochs_dir}")
         return
 
+    # Load Individual Peak Frequencies (ITF + IAF)
+    itf_map, iaf_map = load_individual_peaks(features_dir)
+    if itf_map:
+        print(f"Loaded {len(itf_map)} individual theta peaks for dynamic bands.")
+    else:
+        print("No individual theta peaks found. Using config default.")
+    if iaf_map:
+        print(f"Loaded {len(iaf_map)} IAF values for theta upper-bound capping.")
+
     subjects = get_subjects_with_blocks(epochs_dir, 'pac', blocks)
+    # ... (subject discovery logic same as before)
     if not subjects:
         legacy = sorted(epochs_dir.glob("*_pac_clean-epo.fif"))
         subjects = sorted(set(f.stem.split("_")[0] for f in legacy))
@@ -203,6 +241,30 @@ def main():
                 continue
 
             sfreq = epochs.info['sfreq']
+            
+            # --- Dynamic Band Definition (Issue 1+5+6 fixes) ---
+            # DEEP copy to avoid leaking into cfg across iterations
+            pac_cfg = copy.deepcopy(cfg)
+            fixed_band = cfg.get('pac', {}).get('phase_band', [4, 8])
+            
+            # Try to find individual theta peak
+            itf = itf_map.get((subj, block))
+            if itf:
+                # Cap upper bound at IAF - 1 Hz (not fixed 12 Hz)
+                # This prevents theta band bleeding into alpha
+                iaf = iaf_map.get(subj, 10.0)  # Default IAF ~10 Hz
+                upper_cap = iaf - 1.0
+                
+                low = max(1.5, itf - 2.0)
+                high = min(upper_cap, itf + 2.0)
+                individual_band = [low, high]
+                
+                pac_cfg['pac']['phase_band'] = individual_band
+                
+                print(f"  Individual Theta Band: {low:.1f}-{high:.1f} Hz "
+                      f"(Peak: {itf:.2f}, IAF cap: {upper_cap:.1f})")
+            else:
+                print(f"  Config Theta Band: {fixed_band[0]}-{fixed_band[1]} Hz (no individual peak)")
 
             # === 4a: Between-region PAC (H1) ===
             rf_signal = get_node_signal(epochs, rf_chs)
@@ -211,7 +273,7 @@ def main():
             between_row = {'subject': subj, 'block': block}
 
             if rf_signal is not None and rp_signal is not None:
-                pac_between = compute_pac(rf_signal, rp_signal, sfreq, cfg)
+                pac_between = compute_pac(rf_signal, rp_signal, sfreq, pac_cfg)
                 between_row['pac_between_RF_RP'] = pac_between
                 print(f"  Between PAC (RF→RP): {pac_between:.3f}")
             else:
@@ -221,7 +283,7 @@ def main():
             lf_signal = get_node_signal(epochs, lf_chs)
             lp_signal = get_node_signal(epochs, lp_chs)
             if lf_signal is not None and lp_signal is not None:
-                between_row['pac_between_LF_LP'] = compute_pac(lf_signal, lp_signal, sfreq, cfg)
+                between_row['pac_between_LF_LP'] = compute_pac(lf_signal, lp_signal, sfreq, pac_cfg)
             else:
                 between_row['pac_between_LF_LP'] = np.nan
 
@@ -231,7 +293,7 @@ def main():
             local_row = {'subject': subj, 'block': block}
 
             for node_name, node_chs in all_nodes.items():
-                pac_local = compute_local_node_pac(epochs, node_chs, sfreq, cfg)
+                pac_local = compute_local_node_pac(epochs, node_chs, sfreq, pac_cfg)
                 local_row[f'pac_{node_name}'] = pac_local
                 status = f"{pac_local:.3f}" if not np.isnan(pac_local) else "N/A"
                 print(f"  Local PAC {node_name}: {status}")

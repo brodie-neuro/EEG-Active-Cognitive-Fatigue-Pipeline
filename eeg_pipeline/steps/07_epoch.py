@@ -58,13 +58,18 @@ def main():
         else:
             print("  No stimulus events found for P3b epochs.")
         
-        # PAC Epochs: Response-locked, +200 to +1200 ms (delay period)
-        print("Creating PAC epochs (response-locked)...")
-        resp_events = {k: v for k, v in event_id.items() if 'resp' in k.lower() and 'miss' not in k.lower()}
-        if resp_events:
+        # PAC Epochs: Stimulus-locked, maintenance window
+        # Config defines pac.tmin/tmax relative to stimulus offset,
+        # but we use stimulus-onset locking + offset to capture the
+        # maintenance/retention period where theta-gamma PAC occurs.
+        pac_cfg = cfg.get('epochs', {}).get('pac', {})
+        pac_tmin = pac_cfg.get('tmin', 0.0) + 0.8  # 0.8s = approx stimulus duration
+        pac_tmax = pac_cfg.get('tmax', 1.0) + 0.8
+        print(f"Creating PAC epochs (stimulus-locked, {pac_tmin}-{pac_tmax}s)...")
+        if stim_events:
             epochs_pac = mne.Epochs(
-                raw, events, resp_events,
-                tmin=0.2, tmax=1.2,
+                raw, events, stim_events,
+                tmin=pac_tmin, tmax=pac_tmax,
                 baseline=None,  # No baseline for PAC
                 preload=True,
                 reject=None,
@@ -73,7 +78,7 @@ def main():
             epochs_pac.save(output_dir / f"{subj}_pac-epo.fif", overwrite=True)
             print(f"  PAC epochs: {len(epochs_pac)} trials")
         else:
-            print("  No response events found for PAC epochs.")
+            print("  No stimulus events found for PAC epochs.")
         
         print(f"Saved epochs for {subj}.\n")
 

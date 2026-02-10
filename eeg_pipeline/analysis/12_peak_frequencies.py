@@ -106,15 +106,23 @@ def compute_psd_for_channels(data_source, ch_picks, fmin=1, fmax=30):
 
 
 def extract_iaf(raw, cfg):
-    """Extract IAF from resting-state data using specparam on posterior channels."""
+    """Extract IAF using specparam on posterior channels.
+    
+    NOTE: Ideally this should use dedicated resting-state recordings
+    (eyes-closed, pre/post fatigue). Currently uses block-level ASR-cleaned
+    continuous data as a proxy. Replace with true rest files when available.
+    """
     posterior_chs = ['Oz', 'O1', 'O2', 'POz', 'PO3', 'PO4', 'PO7', 'PO8']
     power, freqs = compute_psd_for_channels(raw, posterior_chs, fmin=1, fmax=30)
 
+    # Load from config or default to 8-14
+    iaf_band = cfg.get('rest', {}).get('iaf', {}).get('band', [8.0, 14.0])
+    
     if SPECPARAM_AVAILABLE:
-        result = extract_peak_frequency(power, freqs, (7, 14), cfg)
+        result = extract_peak_frequency(power, freqs, tuple(iaf_band), cfg)
         return result['peak_freq'], result['aperiodic_exponent']
     else:
-        mask = (freqs >= 7) & (freqs <= 14)
+        mask = (freqs >= iaf_band[0]) & (freqs <= iaf_band[1])
         if mask.sum() == 0:
             return np.nan, np.nan
         peak_idx = np.argmax(power[mask])
@@ -129,11 +137,14 @@ def extract_theta_freq(epochs, cfg):
 
     power, freqs = compute_psd_for_channels(epochs, cf_channels, fmin=1, fmax=30)
 
+    # Load from config or default to 3-9 Hz
+    theta_band = cfg.get('rest', {}).get('theta', {}).get('band', [3.0, 9.0])
+
     if SPECPARAM_AVAILABLE:
-        result = extract_peak_frequency(power, freqs, (4, 8), cfg)
+        result = extract_peak_frequency(power, freqs, tuple(theta_band), cfg)
         return result['peak_freq'], result['aperiodic_exponent']
     else:
-        mask = (freqs >= 4) & (freqs <= 8)
+        mask = (freqs >= theta_band[0]) & (freqs <= theta_band[1])
         if mask.sum() == 0:
             return np.nan, np.nan
         peak_idx = np.argmax(power[mask])

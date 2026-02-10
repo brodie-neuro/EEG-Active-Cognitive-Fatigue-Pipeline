@@ -293,7 +293,33 @@ def plot_psd_specparam():
         except Exception:
             pass
 
-    ax.axvspan(8, 13, alpha=0.1, color='purple', label='α band (8–13 Hz)')
+    # Dynamic band markers from features (or fallback to fixed)
+    iaf_file = FEATURES_DIR / "iaf_features.csv"
+    theta_file = FEATURES_DIR / "theta_freq_features.csv"
+    
+    alpha_lo, alpha_hi = 8, 13  # defaults
+    theta_lo, theta_hi = 4, 8
+    
+    if iaf_file.exists():
+        df_iaf = pd.read_csv(iaf_file)
+        valid = df_iaf.dropna(subset=['iaf'])
+        if len(valid) > 0:
+            mean_iaf = valid['iaf'].mean()
+            alpha_lo = max(6, mean_iaf - 2.0)
+            alpha_hi = min(16, mean_iaf + 2.0)
+    
+    if theta_file.exists():
+        df_theta = pd.read_csv(theta_file)
+        valid = df_theta.dropna(subset=['f_theta'])
+        if len(valid) > 0:
+            mean_itf = valid['f_theta'].mean()
+            theta_lo = max(2, mean_itf - 2.0)
+            theta_hi = min(alpha_lo, mean_itf + 2.0)  # cap at alpha start
+    
+    ax.axvspan(theta_lo, theta_hi, alpha=0.08, color='blue',
+               label=f'θ band ({theta_lo:.0f}–{theta_hi:.0f} Hz)')
+    ax.axvspan(alpha_lo, alpha_hi, alpha=0.08, color='purple',
+               label=f'α band ({alpha_lo:.0f}–{alpha_hi:.0f} Hz)')
     ax.set_xlabel('Frequency (Hz)', fontsize=12)
     ax.set_ylabel('Power (µV²/Hz)', fontsize=12)
     ax.set_title('PSD + Specparam Fit: Posterior (IAF)', fontsize=13, fontweight='bold')

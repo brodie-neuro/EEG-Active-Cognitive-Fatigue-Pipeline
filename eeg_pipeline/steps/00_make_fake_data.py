@@ -190,6 +190,21 @@ def generate_block(block_num, rng):
             data[ch_names.index(ch)] += sine(theta_f, amp=2.5e-6,
                                              phase=float(rng.uniform(0, 2 * np.pi)))
 
+    # Tonic high gamma (broadband, low amplitude)
+    # Present across cortex but strongest parietal — provides baseline
+    # for PAC amplitude extraction and realistic PSD shape
+    gamma_scale = 0.85 if is_fatigued else 1.0  # Slight reduction with fatigue
+    for ch in eeg_names:
+        gamma_f = float(rng.uniform(65, 75))
+        data[ch_names.index(ch)] += sine(gamma_f, amp=0.15e-6 * gamma_scale,
+                                         phase=float(rng.uniform(0, 2 * np.pi)))
+    # Stronger tonic gamma at parietal sites
+    for ch in ["P3", "Pz", "P4", "P8", "PO8", "PO4"]:
+        if ch in eeg_names:
+            gamma_f = float(rng.uniform(65, 75))
+            data[ch_names.index(ch)] += sine(gamma_f, amp=0.3e-6 * gamma_scale,
+                                             phase=float(rng.uniform(0, 2 * np.pi)))
+
     # Line noise
     for hz in [50.0, 100.0]:
         data[:len(eeg_names)] += sine(hz, amp=1.5e-7,

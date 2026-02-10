@@ -67,5 +67,10 @@ regions:
 rest:
   iaf:
     channel: "Oz"
-    band: [7.0, 14.0]
+    band: [6.0, 14.0]
     welch_win: 4.0
+
+  # Individual Theta Frequency (ITF) extraction settings
+  theta:
+    channel: "Fz"
+    band: [3.0, 9.0]
