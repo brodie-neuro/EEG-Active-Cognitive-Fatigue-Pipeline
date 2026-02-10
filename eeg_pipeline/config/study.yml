@@ -63,14 +63,22 @@ regions:
   Central: ['LC', 'C', 'RC']
   Parietal: ['LP', 'CP', 'RP']
 
-# IAF extraction
+# Resting-state recordings (eyes-closed, ~3 min each)
+# Pre-fatigue rest recorded BEFORE the 45-min WAND induction
+# Post-fatigue rest recorded AFTER the induction
+# These are separate .vhdr files, not extracted from task blocks
 rest:
+  pattern: "sub-*_rest-*.vhdr"      # e.g. sub-001_rest-pre.vhdr, sub-001_rest-post.vhdr
+  fallback_to_block_raw: true        # If no rest file found, use block ASR raw as proxy
+
+  # IAF extraction settings (from posterior channels)
   iaf:
-    channel: "Oz"
+    channels: ["Oz", "O1", "O2", "POz", "PO3", "PO4", "PO7", "PO8"]
     band: [6.0, 14.0]
     welch_win: 4.0
 
-  # Individual Theta Frequency (ITF) extraction settings
+  # Individual Theta Frequency (ITF) — task-related, from maintenance epochs
+  # (NOT from rest — extracted in 12_peak_frequencies.py from PAC epochs)
   theta:
     channel: "Fz"
     band: [3.0, 9.0]

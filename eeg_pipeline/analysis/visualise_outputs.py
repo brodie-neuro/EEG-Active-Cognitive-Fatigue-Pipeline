@@ -375,6 +375,124 @@ def plot_p3b_erp_filtered():
     print(f"Saved filtered P3b ERP plot")
     plt.close(fig)
 
+def plot_iaf_comparison():
+    """Plot IAF comparison: Pre vs Post fatigue resting-state.
+    
+    Shows specparam-extracted alpha peaks with Gaussian bandwidth,
+    and paired t-test results. No mixed models needed — just two
+    resting-state timepoints.
+    """
+    from scipy.stats import ttest_rel
+    
+    iaf_file = FEATURES_DIR / "iaf_features.csv"
+    if not iaf_file.exists():
+        print("No IAF features found — skipping IAF comparison plot.")
+        return
+
+    df = pd.read_csv(iaf_file)
+    
+    pre = df[df['timepoint'] == 'pre'].dropna(subset=['iaf'])
+    post = df[df['timepoint'] == 'post'].dropna(subset=['iaf'])
+    
+    if len(pre) == 0 or len(post) == 0:
+        print("Insufficient IAF data for comparison — skipping.")
+        return
+
+    fig, axes = plt.subplots(1, 3, figsize=(16, 5))
+    
+    # --- Panel 1: Gaussian peaks overlay (Pre vs Post) ---
+    ax1 = axes[0]
+    freqs = np.linspace(4, 18, 500)
+    
+    # Plot individual subject peaks as Gaussians
+    for _, row in pre.iterrows():
+        peak = row['iaf']
+        width = 1.5  # Approximate Gaussian bandwidth (Hz)
+        gaussian = np.exp(-0.5 * ((freqs - peak) / width) ** 2)
+        ax1.plot(freqs, gaussian, color='#2196F3', alpha=0.3, linewidth=1)
+    
+    for _, row in post.iterrows():
+        peak = row['iaf']
+        width = 1.5
+        gaussian = np.exp(-0.5 * ((freqs - peak) / width) ** 2)
+        ax1.plot(freqs, gaussian, color='#F44336', alpha=0.3, linewidth=1)
+    
+    # Group mean Gaussians (bold)
+    pre_mean = pre['iaf'].mean()
+    post_mean = post['iaf'].mean()
+    
+    ax1.plot(freqs, np.exp(-0.5 * ((freqs - pre_mean) / 1.5) ** 2),
+             color='#1565C0', linewidth=3, label=f'Pre (M={pre_mean:.2f} Hz)')
+    ax1.plot(freqs, np.exp(-0.5 * ((freqs - post_mean) / 1.5) ** 2),
+             color='#C62828', linewidth=3, label=f'Post (M={post_mean:.2f} Hz)')
+    
+    ax1.set_xlabel('Frequency (Hz)', fontsize=11)
+    ax1.set_ylabel('Normalised Power', fontsize=11)
+    ax1.set_title('Individual Alpha Peaks', fontsize=13, fontweight='bold')
+    ax1.legend(fontsize=9)
+    ax1.grid(True, alpha=0.3)
+    
+    # --- Panel 2: Paired comparison (lines connecting pre-post) ---
+    ax2 = axes[1]
+    
+    # Merge on subject for paired comparison
+    merged = pre.merge(post, on='subject', suffixes=('_pre', '_post'))
+    
+    if len(merged) > 0:
+        for _, row in merged.iterrows():
+            ax2.plot([0, 1], [row['iaf_pre'], row['iaf_post']],
+                     'o-', color='gray', alpha=0.5, markersize=6)
+        
+        # Group means
+        ax2.plot([0, 1], [merged['iaf_pre'].mean(), merged['iaf_post'].mean()],
+                 's-', color='black', linewidth=3, markersize=10, zorder=5,
+                 label='Group Mean')
+        
+        # Paired t-test
+        t_stat, p_val = ttest_rel(merged['iaf_pre'], merged['iaf_post'])
+        sig = '***' if p_val < 0.001 else '**' if p_val < 0.01 else '*' if p_val < 0.05 else 'n.s.'
+        
+        ax2.set_title(f'IAF Slowing: t={t_stat:.2f}, p={p_val:.3f} {sig}',
+                      fontsize=12, fontweight='bold')
+    else:
+        ax2.set_title('IAF Pre vs Post', fontsize=12, fontweight='bold')
+    
+    ax2.set_xticks([0, 1])
+    ax2.set_xticklabels(['Pre-Fatigue', 'Post-Fatigue'], fontsize=11)
+    ax2.set_ylabel('IAF (Hz)', fontsize=11)
+    ax2.grid(True, alpha=0.3, axis='y')
+    
+    # --- Panel 3: Distribution (violin/box) ---
+    ax3 = axes[2]
+    
+    pre_vals = pre['iaf'].values
+    post_vals = post['iaf'].values
+    
+    bp = ax3.boxplot([pre_vals, post_vals], positions=[0, 1], widths=0.4,
+                     patch_artist=True, showmeans=True,
+                     meanprops=dict(marker='D', markerfacecolor='black', markersize=8))
+    bp['boxes'][0].set_facecolor('#BBDEFB')
+    bp['boxes'][1].set_facecolor('#FFCDD2')
+    
+    # Individual points
+    ax3.scatter(np.zeros(len(pre_vals)) + np.random.normal(0, 0.04, len(pre_vals)),
+                pre_vals, color='#1565C0', alpha=0.6, s=30, zorder=5)
+    ax3.scatter(np.ones(len(post_vals)) + np.random.normal(0, 0.04, len(post_vals)),
+                post_vals, color='#C62828', alpha=0.6, s=30, zorder=5)
+    
+    ax3.set_xticks([0, 1])
+    ax3.set_xticklabels(['Pre', 'Post'], fontsize=11)
+    ax3.set_ylabel('IAF (Hz)', fontsize=11)
+    ax3.set_title('IAF Distribution', fontsize=13, fontweight='bold')
+    ax3.grid(True, alpha=0.3, axis='y')
+    
+    fig.suptitle('Individual Alpha Frequency: Pre vs Post Fatigue (Resting State)',
+                 fontsize=15, fontweight='bold', y=1.02)
+    fig.tight_layout()
+    fig.savefig(OUTPUT_DIR / "iaf_pre_post_comparison.png", dpi=150, bbox_inches='tight')
+    print("Saved IAF pre vs post comparison plot")
+    plt.close(fig)
+
 
 if __name__ == "__main__":
     print("=== Generating Analysis Visualisations (v2) ===\n")
@@ -382,4 +500,5 @@ if __name__ == "__main__":
     plot_pac_montage()
     plot_between_pac_montage()
     plot_p3b_erp_filtered()
+    plot_iaf_comparison()
     print(f"\nAll figures saved to {OUTPUT_DIR}")

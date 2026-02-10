@@ -200,27 +200,48 @@ def main():
         print(f"\nSaved theta frequency features (long format) to {output_theta}")
         print(df_theta.to_string(index=False))
 
-    # --- IAF: separate output (pre/post rest, not block-based) ---
+    # --- IAF: from dedicated resting-state files (pre/post) ---
+    # Priority: dedicated rest files > ASR block raws (fallback)
     iaf_rows = []
+    rest_cfg = cfg.get('rest', {})
+    rest_dir = pipeline_dir / "raw"  # where rest .vhdr files would live
+    fallback = rest_cfg.get('fallback_to_block_raw', True)
 
     for subj in subjects:
-        for label, suffix in [('pre', f'block{blocks[0]}'), ('post', f'block{blocks[-1]}')]:
-            raw_file = raw_dir / f"{subj}_{suffix}_asr-raw.fif"
-            if not raw_file.exists():
-                raw_file = raw_dir / f"{subj}_asr-raw.fif"
+        for label, block_suffix in [('pre', f'block{blocks[0]}'), ('post', f'block{blocks[-1]}')]:
+            raw = None
+            source = None
 
-            if raw_file.exists():
+            # 1. Try dedicated rest file (e.g. sub-001_rest-pre.vhdr)
+            rest_file = rest_dir / f"{subj}_rest-{label}.vhdr"
+            if rest_file.exists():
                 try:
-                    raw = mne.io.read_raw_fif(raw_file, preload=True, verbose=False)
-                    iaf, aperiodic = extract_iaf(raw, cfg)
-                    iaf_rows.append({
-                        'subject': subj,
-                        'timepoint': label,
-                        'iaf': iaf,
-                        'aperiodic_exp': aperiodic,
-                    })
+                    raw = mne.io.read_raw_brainvision(str(rest_file), preload=True, verbose=False)
+                    source = "rest file"
                 except Exception as e:
-                    print(f"  IAF ({label}) failed: {e}")
+                    print(f"  Rest file load failed ({label}): {e}")
+
+            # 2. Fallback: ASR-cleaned block raw
+            if raw is None and fallback:
+                raw_file = raw_dir / f"{subj}_{block_suffix}_asr-raw.fif"
+                if not raw_file.exists():
+                    raw_file = raw_dir / f"{subj}_asr-raw.fif"
+                if raw_file.exists():
+                    try:
+                        raw = mne.io.read_raw_fif(raw_file, preload=True, verbose=False)
+                        source = "block raw (fallback)"
+                    except Exception as e:
+                        print(f"  Block raw load failed ({label}): {e}")
+
+            if raw is not None:
+                iaf, aperiodic = extract_iaf(raw, cfg)
+                iaf_rows.append({
+                    'subject': subj,
+                    'timepoint': label,
+                    'iaf': iaf,
+                    'aperiodic_exp': aperiodic,
+                })
+                print(f"  {subj} IAF ({label}, {source}): {iaf:.2f} Hz" if not np.isnan(iaf) else f"  {subj} IAF ({label}): N/A")
 
     if iaf_rows:
         df_iaf = pd.DataFrame(iaf_rows)
