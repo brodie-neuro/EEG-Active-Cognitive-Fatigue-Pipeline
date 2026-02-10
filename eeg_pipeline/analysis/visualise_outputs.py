@@ -207,7 +207,7 @@ def plot_between_pac_montage():
     axes[0].legend(handles=legend_elements, loc='upper left', fontsize=9, frameon=True)
 
     # Move suptitle higher to avoid overlap
-    fig.suptitle('Between-Region PAC: Frontal $\\theta$ $\\rightarrow$ Parietal $\\gamma$ (H1)',
+    fig.suptitle('Between-Region PAC: Frontal $\\theta$ $\\rightarrow$ Parietal $\\gamma$',
                 fontsize=16, fontweight='bold', y=0.98)
     fig.tight_layout(rect=[0, 0, 1, 0.95]) # Reserve space at top
     fig.savefig(OUTPUT_DIR / "pac_between_montage.png", dpi=150, bbox_inches='tight')

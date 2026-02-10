@@ -38,30 +38,17 @@ The pipeline implements the analysis plan for the Missing Link study (Mangan & K
 
 All analyses compare **Block 1** (baseline) with **Block 5** (fatigued). Change scores (Δ = Block 5 − Block 1) serve as the primary variables.
 
-| Step | Script | Hypothesis | Function |
-|:-----|:-------|:-----------|:---------|
-| 1 | `10_erp_p3b.py` | **H5** | P3b ERP analysis (confirmatory anchor) |
-| 2–3 | `12_peak_frequencies.py` | **H6, H2** | IAF (specparam) + theta peak frequency |
-| 4 | `13_pac_nodal.py` | **H1, H3** | Between-region PAC (RF→RP) + local PAC |
-| 5 | `11_band_power.py` | — | Frontal midline theta power (feeds H4) |
-| 6–7 | `16_regression_model.py` | **H4** | Merge features → CSV for R modelling (lme4/lmerTest) |
+| Step | Script | Function |
+|:-----|:-------|:---------|
+| 1 | `10_erp_p3b.py` | P3b ERP analysis (confirmatory anchor) |
+| 2–3 | `12_peak_frequencies.py` | IAF (specparam) + theta peak frequency |
+| 4 | `13_pac_nodal.py` | Between-region PAC (RF→RP) + local PAC |
+| 5 | `11_band_power.py` | Frontal midline theta power |
+| 6–7 | `16_regression_model.py` | Merge features → CSV for R modelling (lme4/lmerTest) |
 
 ### Baseline Comparison (`baseline_pipeline/`)
 
 Traditional preprocessing pipeline for methods comparison.
-
----
-
-## Hypotheses
-
-| ID | Hypothesis | Test |
-|:---|:-----------|:-----|
-| **H1** | Fatigue disrupts frontoparietal CFC (RF→RP) | Between-region PAC decline |
-| **H2** | Theta rhythm becomes mistuned under fatigue | Theta peak frequency slowing (specparam) |
-| **H3** | Local PAC degrades more frontally than parietally | Region × Block interaction |
-| **H4** | Combined markers disambiguate effort from breakdown | Integrated regression model |
-| **H5** | P3b amplitude declines with fatigue | Confirmatory t-test |
-| **H6** | IAF slows with fatigue | Confirmatory t-test |
 
 ---
 
@@ -121,7 +108,6 @@ All pipeline parameters are set in `eeg_pipeline/config/study.yml`:
 See `docs/` for detailed methodology:
 
 - `preprocessing_pipeline.md` — Pre-processing rationale and steps
-- `justification_hypotheses.md` — Hypothesis justification and model comparison strategy
 - `methodology_pac_zscore.md` — Why surrogate z-scores for PAC
 - `docs/figures/` — MATLAB-generated artifact visualisation figures
 
