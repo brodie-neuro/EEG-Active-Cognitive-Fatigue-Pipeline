@@ -151,25 +151,26 @@ def generate_block(block_num, rng):
     """
     is_fatigued = (block_num == 5)
 
-    # Fatigue adjustments
-    p3b_scale = FATIGUE['p3b_amp_scale'] if is_fatigued else 1.0
-    theta_shift = FATIGUE['theta_freq_shift'] if is_fatigued else 0.0
-    alpha_shift = FATIGUE['alpha_freq_shift'] if is_fatigued else 0.0
-    pac_scale = FATIGUE['pac_amp_scale'] if is_fatigued else 1.0
-    miss_p = MISS_P + (FATIGUE['miss_p_increase'] if is_fatigued else 0.0)
-    rt_mean = RT_MEAN + (FATIGUE['rt_mean_increase'] if is_fatigued else 0.0)
-    blinks_per_min = BLINKS_PER_MIN + (FATIGUE['blinks_increase'] if is_fatigued else 0)
+    # Fatigue adjustments (subtler effect)
+    p3b_scale = 0.85 if is_fatigued else 1.0
+    theta_shift = -0.5 if is_fatigued else 0.0
+    alpha_shift = -0.2 if is_fatigued else 0.0
+    pac_scale = 0.7 if is_fatigued else 1.0
+    miss_p = MISS_P + (0.04 if is_fatigued else 0.0)
+    rt_mean = RT_MEAN + (0.08 if is_fatigued else 0.0)
+    blinks_per_min = BLINKS_PER_MIN + (5 if is_fatigued else 0)
 
     info = mne.create_info(ch_names=ch_names, sfreq=SFREQ, ch_types=ch_types)
     info.set_montage(mont, match_case=False)
 
-    # ---- Base EEG ----
+    # ---- Base EEG (Lower noise for clean ERPs) ----
     data = np.zeros((n_ch, n_samp), dtype=float)
 
     for i in range(len(eeg_names)):
         base = pink_noise(n_samp, rng)
-        white = rng.normal(0, 0.3, n_samp)
-        data[i] = (base + white) * 30e-6
+        white = rng.normal(0, 0.1, n_samp)
+        # Very low noise background so ERPs are pristine
+        data[i] = (base + white) * 5e-6 
 
     # Slow drift
     drift = sine(0.03, amp=5.0e-6, phase=float(rng.uniform(0, 2 * np.pi)))
@@ -213,29 +214,33 @@ def generate_block(block_num, rng):
     # Stimulus-offset triggers (Trigger 2, at 800 ms post-stimulus)
     onsets_stim_offset = onsets_stim + 0.8
 
-    # ---- ERPs ----
-    erp_t = np.arange(int(0.8 * SFREQ)) / SFREQ
+    # ---- ERPs (Textbook P3b) ----
+    # 800ms window
+    t_erp = np.linspace(0, 0.8, int(0.8 * SFREQ))
+    
+    # N1 (negative @ 100ms), P2 (positive @ 200ms) - small sensory components
+    n1 = -3.0e-6 * np.exp(-0.5 * ((t_erp - 0.100) / 0.020) ** 2)
+    p2 =  2.0e-6 * np.exp(-0.5 * ((t_erp - 0.200) / 0.040) ** 2)
+    sensory_erp = n1 + p2
 
-    sensory_kernel = (
-        gauss_kernel(0.10, 0.020, -1.2e-6, erp_t) +
-        gauss_kernel(0.18, 0.030, 1.0e-6, erp_t) +
-        gauss_kernel(0.32, 0.060, 0.8e-6, erp_t)
-    )
+    # P3b (positive @ 400ms), massive and broad
+    p3b_base_amp = 25.0e-6 * p3b_scale
+    p3b_erp = p3b_base_amp * np.exp(-0.5 * ((t_erp - 0.400) / 0.140) ** 2)
 
-    # P3b scaled by fatigue
-    p3_kernel = gauss_kernel(0.38, 0.080, 2.8e-6 * p3b_scale, erp_t)
-
-    posterior_erp_chs = [c for c in ["Pz", "CPz", "POz", "P3", "P4"] if c in eeg_names]
-    frontal_erp_chs = [c for c in ["Fz", "FCz"] if c in eeg_names]
+    posterior_erp_chs = [c for c in ["Pz", "CPz", "POz", "P3", "P4", "P1", "P2"] if c in eeg_names]
+    frontal_erp_chs = [c for c in ["Fz", "FCz", "Fz", "AFz"] if c in eeg_names]
 
     for tr, t0 in enumerate(onsets_stim):
+        # Sensory ERP on all trials
         for ch in posterior_erp_chs:
-            add_erp(data[ch_names.index(ch)], t0, sensory_kernel, SFREQ)
+            add_erp(data[ch_names.index(ch)], t0, sensory_erp, SFREQ)
         for ch in frontal_erp_chs:
-            add_erp(data[ch_names.index(ch)], t0, 0.45 * sensory_kernel, SFREQ)
+            add_erp(data[ch_names.index(ch)], t0, 0.5 * sensory_erp, SFREQ)
+            
+        # P3b on targets only
         if is_target[tr]:
             for ch in posterior_erp_chs:
-                add_erp(data[ch_names.index(ch)], t0, p3_kernel, SFREQ)
+                add_erp(data[ch_names.index(ch)], t0, p3b_erp, SFREQ)
 
     # ---- PAC: inject theta-gamma coupling during maintenance ----
     # Phase from frontal theta, amplitude modulation at parietal gamma

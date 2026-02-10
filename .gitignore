@@ -36,3 +36,4 @@ WAND_full_induction.py
 docs/old_analysis/
 docs/v2_plan_text.txt
 eeg_pipeline/analysis/removed/
+eeg_pipeline/outputs/analysis_figures/
