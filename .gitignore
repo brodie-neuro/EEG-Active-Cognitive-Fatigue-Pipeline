@@ -46,3 +46,12 @@ eeg_pipeline/outputs/logs/
 eeg_pipeline/outputs/qc/
 eeg_pipeline/outputs/reports/
 vis_log.txt
+
+# --- 8. Local datasets and pipeline run artifacts ---
+openneuro_ds004350/
+eeg_pipeline/outputs/
+
+# --- 9. Local config artifacts ---
+eeg_pipeline/config/backups/
+eeg_pipeline/config/presets/
+eeg_pipeline/config/adapters/*.json

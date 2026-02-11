@@ -66,10 +66,14 @@ def compute_pac_tensorpac(phase_signal, amp_signal, sfreq, cfg):
 
     try:
         pac_vals = p.filterfit(sfreq, pha_data, amp_data, n_perm=n_surr)
-        return float(np.nanmean(pac_vals))
+        pac_mean = float(np.nanmean(pac_vals))
+        if np.isnan(pac_mean):
+            # Tensorpac can return all-NaN in low-SNR cases; use deterministic fallback.
+            return compute_pac_fallback(phase_signal, amp_signal, sfreq, cfg)
+        return pac_mean
     except Exception as e:
         print(f"  tensorpac failed: {e}")
-        return np.nan
+        return compute_pac_fallback(phase_signal, amp_signal, sfreq, cfg)
 
 
 def compute_pac_fallback(phase_signal, amp_signal, sfreq, cfg):
@@ -132,6 +136,11 @@ def _modulation_index(theta_phase, gamma_amp, n_bins=18):
 
 def compute_pac(phase_signal, amp_signal, sfreq, cfg):
     """Dispatch to tensorpac or fallback."""
+    # For very short epochs (~1 s), fallback MI is often more stable than
+    # tensorpac's z-scored estimator.
+    if phase_signal.shape[1] <= 600:
+        return compute_pac_fallback(phase_signal, amp_signal, sfreq, cfg)
+
     if TENSORPAC_AVAILABLE:
         return compute_pac_tensorpac(phase_signal, amp_signal, sfreq, cfg)
     else:

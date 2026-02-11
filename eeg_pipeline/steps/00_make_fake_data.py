@@ -1,8 +1,8 @@
 # steps/00_make_fake_data.py
 """
 Generate synthetic EEG data for pipeline testing.
-Produces Block 1 (baseline) and Block 5 (fatigued) with realistic
-fatigue effects: reduced P3b, slower theta, reduced PAC.
+Produces Block 1 (baseline) and Block 5 (fatigued) with pronounced,
+deterministic fatigue effects across ERP, oscillatory, and PAC measures.
 """
 from pathlib import Path
 import numpy as np
@@ -19,6 +19,7 @@ DURATION_S = 5 * 60  # 5 minutes per block
 TRIAL_ISI_MIN = 2.0
 TRIAL_ISI_MAX = 3.0
 STIM_DUR = 0.20
+MAINTENANCE_OFFSET = 0.80  # Trigger for maintenance-window onset
 TARGET_P = 0.25
 
 # Behaviour model (baseline)
@@ -33,15 +34,21 @@ RT_MAX = 1.20
 BLINKS_PER_MIN = 15
 BLINK_LOCKOUT = 0.45
 
-# Fatigue effects (Block 5 modifications)
+# Fatigue effects (Block 5 modifiers, all used in generate_block)
 FATIGUE = {
-    'p3b_amp_scale': 0.60,      # P3b drops to 60% of Block 1
-    'theta_freq_shift': -0.8,   # Theta slows by ~0.8 Hz
-    'alpha_freq_shift': -0.3,   # IAF slows slightly
-    'pac_amp_scale': 0.5,       # Gamma amplitude modulation halved
-    'miss_p_increase': 0.06,    # More misses
-    'rt_mean_increase': 0.08,   # Slower reactions
-    'blinks_increase': 5,       # More blinks per min
+    'p3b_amp_scale': 0.45,           # Reduced P3b amplitude
+    'p3b_latency_shift_s': 0.08,     # Delayed P3b peak
+    'theta_freq_shift_hz': -2.2,     # Slower theta
+    'theta_amp_scale': 1.55,         # Stronger low-theta power
+    'alpha_freq_shift_hz': -1.0,     # Slower alpha/IAF
+    'alpha_amp_scale': 0.55,         # Reduced alpha power
+    'gamma_tonic_scale': 0.70,       # Slight gamma reduction
+    'pac_amp_scale': 0.10,           # Marked PAC reduction
+    'miss_p_increase': 0.10,         # More misses
+    'err_p_increase': 0.10,          # More commission errors
+    'rt_mean_increase_s': 0.16,      # Slower responses
+    'rt_sd_increase_s': 0.05,        # More variable RT
+    'blinks_increase_per_min': 8,    # More blinks
 }
 
 RNG = np.random.default_rng(42)
@@ -55,11 +62,12 @@ mont = make_standard_montage("standard_1020")
 all10_20 = mont.ch_names
 
 sel64 = [
-    "Fp1", "Fp2", "AF3", "AF4", "F7", "F3", "Fz", "F4", "F8",
+    "Fp1", "Fp2", "AF3", "AF4", "AFz", "F7", "F3", "Fz", "F4", "F8",
     "FC5", "FC1", "FC2", "FC6",
+    "FCz",
     "T7", "C3", "Cz", "C4", "T8",
     "CP5", "CP1", "CP2", "CP6",
-    "P7", "P3", "Pz", "P4", "P8",
+    "P7", "P5", "P3", "Pz", "P4", "P6", "P8",
     "PO7", "PO3", "POz", "PO4", "PO8", "O1", "Oz", "O2",
     "F1", "F2", "C1", "C2", "CP3", "CPz", "CP4", "P1", "P2",
     "AF7", "AF8", "FT7", "FT8", "FC3", "FC4", "TP7", "TP8",
@@ -107,6 +115,21 @@ def make_trial_onsets(duration_s, isi_min, isi_max, rng):
     return np.array(onsets, dtype=float)
 
 
+def fixed_rate_mask(n, p, rng):
+    """
+    Create a boolean mask with an exact count close to n * p.
+    Reduces block-to-block stochastic drift for synthetic condition effects.
+    """
+    p = float(np.clip(p, 0.0, 1.0))
+    n_true = int(round(n * p))
+    n_true = min(max(n_true, 0), n)
+    mask = np.zeros(n, dtype=bool)
+    if n_true > 0:
+        idx = rng.choice(n, size=n_true, replace=False)
+        mask[idx] = True
+    return mask
+
+
 def gauss_kernel(center_s, width_s, amp, tvec):
     return amp * np.exp(-0.5 * ((tvec - center_s) / width_s) ** 2)
 
@@ -151,14 +174,20 @@ def generate_block(block_num, rng):
     """
     is_fatigued = (block_num == 5)
 
-    # Fatigue adjustments (subtler effect)
-    p3b_scale = 0.85 if is_fatigued else 1.0
-    theta_shift = -0.5 if is_fatigued else 0.0
-    alpha_shift = -0.2 if is_fatigued else 0.0
-    pac_scale = 0.7 if is_fatigued else 1.0
-    miss_p = MISS_P + (0.04 if is_fatigued else 0.0)
-    rt_mean = RT_MEAN + (0.08 if is_fatigued else 0.0)
-    blinks_per_min = BLINKS_PER_MIN + (5 if is_fatigued else 0)
+    # Fatigue adjustments
+    p3b_scale = FATIGUE['p3b_amp_scale'] if is_fatigued else 1.0
+    p3b_latency_shift_s = FATIGUE['p3b_latency_shift_s'] if is_fatigued else 0.0
+    theta_shift = FATIGUE['theta_freq_shift_hz'] if is_fatigued else 0.0
+    theta_amp_scale = FATIGUE['theta_amp_scale'] if is_fatigued else 1.0
+    alpha_shift = FATIGUE['alpha_freq_shift_hz'] if is_fatigued else 0.0
+    alpha_amp_scale = FATIGUE['alpha_amp_scale'] if is_fatigued else 1.0
+    gamma_tonic_scale = FATIGUE['gamma_tonic_scale'] if is_fatigued else 1.0
+    pac_scale = FATIGUE['pac_amp_scale'] if is_fatigued else 1.0
+    miss_p = MISS_P + (FATIGUE['miss_p_increase'] if is_fatigued else 0.0)
+    err_p = ERR_P + (FATIGUE['err_p_increase'] if is_fatigued else 0.0)
+    rt_mean = RT_MEAN + (FATIGUE['rt_mean_increase_s'] if is_fatigued else 0.0)
+    rt_sd = RT_SD + (FATIGUE['rt_sd_increase_s'] if is_fatigued else 0.0)
+    blinks_per_min = BLINKS_PER_MIN + (FATIGUE['blinks_increase_per_min'] if is_fatigued else 0)
 
     info = mne.create_info(ch_names=ch_names, sfreq=SFREQ, ch_types=ch_types)
     info.set_montage(mont, match_case=False)
@@ -176,24 +205,24 @@ def generate_block(block_num, rng):
     drift = sine(0.03, amp=5.0e-6, phase=float(rng.uniform(0, 2 * np.pi)))
     data[:len(eeg_names)] += drift
 
-    # Posterior alpha (with fatigue slowing)
+    # Posterior alpha (fatigue: slower + weaker)
     alpha_f = float(rng.uniform(9.5, 10.5)) + alpha_shift
     for ch in ["Pz", "POz", "PO3", "PO4", "O1", "Oz", "O2", "PO7", "PO8"]:
         if ch in eeg_names:
-            data[ch_names.index(ch)] += sine(alpha_f, amp=6e-6,
+            data[ch_names.index(ch)] += sine(alpha_f, amp=6.5e-6 * alpha_amp_scale,
                                              phase=float(rng.uniform(0, 2 * np.pi)))
 
-    # Fronto-midline theta (with fatigue slowing)
-    theta_f = float(rng.uniform(5.0, 6.2)) + theta_shift
+    # Fronto-midline theta (fatigue: slower + stronger)
+    theta_f = float(rng.uniform(6.4, 7.2)) + theta_shift
     for ch in ["Fz", "FCz", "Cz"]:
         if ch in eeg_names:
-            data[ch_names.index(ch)] += sine(theta_f, amp=2.5e-6,
+            data[ch_names.index(ch)] += sine(theta_f, amp=2.8e-6 * theta_amp_scale,
                                              phase=float(rng.uniform(0, 2 * np.pi)))
 
     # Tonic high gamma (broadband, low amplitude)
     # Present across cortex but strongest parietal -- provides baseline
     # for PAC amplitude extraction and realistic PSD shape
-    gamma_scale = 0.85 if is_fatigued else 1.0  # Slight reduction with fatigue
+    gamma_scale = gamma_tonic_scale
     for ch in eeg_names:
         gamma_f = float(rng.uniform(65, 75))
         data[ch_names.index(ch)] += sine(gamma_f, amp=0.15e-6 * gamma_scale,
@@ -214,20 +243,27 @@ def generate_block(block_num, rng):
     onsets_stim = make_trial_onsets(DURATION_S, TRIAL_ISI_MIN, TRIAL_ISI_MAX, rng)
     n_trials = len(onsets_stim)
 
-    is_target = rng.random(n_trials) < TARGET_P
-    is_miss = rng.random(n_trials) < miss_p
-    is_error = (rng.random(n_trials) < ERR_P) & (~is_miss)
+    # Exact-rate masks reduce accidental condition inversions in single-subject mocks
+    is_target = fixed_rate_mask(n_trials, TARGET_P, rng)
+    is_miss = fixed_rate_mask(n_trials, miss_p, rng)
+    is_error = np.zeros(n_trials, dtype=bool)
+    non_miss_idx = np.where(~is_miss)[0]
+    n_error = int(round(len(non_miss_idx) * max(0.0, min(err_p, 1.0))))
+    if n_error > 0 and len(non_miss_idx) > 0:
+        error_idx = rng.choice(non_miss_idx, size=min(n_error, len(non_miss_idx)),
+                               replace=False)
+        is_error[error_idx] = True
 
     rts = np.full(n_trials, np.nan, dtype=float)
-    rt_raw = rng.normal(rt_mean, RT_SD, size=n_trials)
+    rt_raw = rng.normal(rt_mean, rt_sd, size=n_trials)
     rt_raw = np.clip(rt_raw, RT_MIN, RT_MAX)
     rts[~is_miss] = rt_raw[~is_miss]
 
     onsets_resp = onsets_stim + np.nan_to_num(rts, nan=0.0)
     has_resp = ~is_miss
 
-    # Stimulus-offset triggers (Trigger 2, at 800 ms post-stimulus)
-    onsets_stim_offset = onsets_stim + 0.8
+    # Maintenance-onset triggers (Trigger 2, at +800 ms post-stimulus)
+    onsets_maintenance = onsets_stim + MAINTENANCE_OFFSET
 
     # ---- ERPs (Textbook P3b) ----
     # 800ms window
@@ -238,9 +274,10 @@ def generate_block(block_num, rng):
     p2 =  2.0e-6 * np.exp(-0.5 * ((t_erp - 0.200) / 0.040) ** 2)
     sensory_erp = n1 + p2
 
-    # P3b (positive @ 400ms), massive and broad
+    # P3b (positive ~400 ms baseline; delayed in fatigue)
     p3b_base_amp = 25.0e-6 * p3b_scale
-    p3b_erp = p3b_base_amp * np.exp(-0.5 * ((t_erp - 0.400) / 0.140) ** 2)
+    p3b_center = 0.400 + p3b_latency_shift_s
+    p3b_erp = p3b_base_amp * np.exp(-0.5 * ((t_erp - p3b_center) / 0.140) ** 2)
 
     posterior_erp_chs = [c for c in ["Pz", "CPz", "POz", "P3", "P4", "P1", "P2"] if c in eeg_names]
     frontal_erp_chs = [c for c in ["Fz", "FCz", "Fz", "AFz"] if c in eeg_names]
@@ -257,14 +294,13 @@ def generate_block(block_num, rng):
             for ch in posterior_erp_chs:
                 add_erp(data[ch_names.index(ch)], t0, p3b_erp, SFREQ)
 
-    # ---- PAC: inject theta-gamma coupling during maintenance ----
-    # Phase from frontal theta, amplitude modulation at parietal gamma
+    # ---- PAC: inject directed RF(theta phase) -> RP(gamma amplitude) coupling ----
     rf_chs = [c for c in ["F8", "F4", "FC6"] if c in eeg_names]
     rp_chs = [c for c in ["P8", "P4", "PO8"] if c in eeg_names]
 
     for tr, t0 in enumerate(onsets_stim):
         # Maintenance window: 800-1800 ms post-stimulus
-        maint_start = t0 + 0.8
+        maint_start = t0 + MAINTENANCE_OFFSET
         maint_end = t0 + 1.8
         i_start = int(maint_start * SFREQ)
         i_end = min(int(maint_end * SFREQ), n_samp)
@@ -274,21 +310,20 @@ def generate_block(block_num, rng):
         seg_len = i_end - i_start
         seg_t = np.arange(seg_len) / SFREQ
 
-        # Theta phase signal (frontal)
+        # RF theta phase source
         theta_phase = 2 * np.pi * theta_f * seg_t
+        rf_theta = np.sin(theta_phase) * (2.2e-6 if not is_fatigued else 1.2e-6)
 
-        # Gamma burst modulated by theta phase (PAC)
-        gamma_f = float(rng.uniform(65, 75))
+        # RP high-gamma carrier amplitude-modulated by RF theta phase
+        gamma_f = 70.0
         gamma_carrier = np.sin(2 * np.pi * gamma_f * seg_t)
-        # Amplitude envelope: peaks at theta trough (phase-amplitude coupling)
         pac_envelope = (1.0 + pac_scale * np.cos(theta_phase)) / 2.0
-        pac_signal = pac_envelope * gamma_carrier * 0.3e-6
+        rp_pac = pac_envelope * gamma_carrier * 1.6e-6
 
-        # Inject into RF and RP nodes
         for ch in rf_chs:
-            data[ch_names.index(ch), i_start:i_end] += pac_signal * 0.5
+            data[ch_names.index(ch), i_start:i_end] += rf_theta
         for ch in rp_chs:
-            data[ch_names.index(ch), i_start:i_end] += pac_signal
+            data[ch_names.index(ch), i_start:i_end] += rp_pac
 
     # ---- EOG ----
     veog = np.zeros(n_samp, dtype=float)
@@ -330,6 +365,10 @@ def generate_block(block_num, rng):
     burst_env = gauss_kernel(0.05, 0.020, 1.0, bt2)
     burst_env = burst_env / np.max(burst_env)
 
+    # Precompute high-gamma carriers once (faster than per-trial filtering)
+    burst_carrier_l_full = band_noise(60.0, 120.0, amp=1.0)
+    burst_carrier_r_full = band_noise(60.0, 120.0, amp=1.0)
+
     for tr in range(n_trials):
         if not has_resp[tr]:
             continue
@@ -341,8 +380,8 @@ def generate_block(block_num, rng):
         seg_len = i1 - i0
         if seg_len <= 0:
             continue
-        burst_carrier_l = band_noise(60.0, 120.0, amp=1.0)[:seg_len]
-        burst_carrier_r = band_noise(60.0, 120.0, amp=1.0)[:seg_len]
+        burst_carrier_l = burst_carrier_l_full[i0:i1]
+        burst_carrier_r = burst_carrier_r_full[i0:i1]
         amp = float(rng.uniform(4e-6, 9e-6))
         emg_l[i0:i1] += amp * burst_env[:seg_len] * burst_carrier_l
         emg_r[i0:i1] += amp * burst_env[:seg_len] * burst_carrier_r
@@ -361,10 +400,10 @@ def generate_block(block_num, rng):
     stim_desc = np.where(is_target, "stim/target", "stim/nontarget")
     ann = mne.Annotations(onsets_stim, [STIM_DUR] * n_trials, list(stim_desc))
 
-    # Stimulus offset (Trigger 2) -- marks start of maintenance window
-    valid_offset = onsets_stim_offset < DURATION_S
+    # Maintenance onset (Trigger 2) -- marks start of maintenance window
+    valid_offset = onsets_maintenance < DURATION_S
     ann += mne.Annotations(
-        onsets_stim_offset[valid_offset],
+        onsets_maintenance[valid_offset],
         [0.01] * int(valid_offset.sum()),
         ["stim/offset"] * int(valid_offset.sum())
     )
@@ -382,7 +421,7 @@ def generate_block(block_num, rng):
     ann += mne.Annotations(resp_onsets, resp_dur, resp_desc)
 
     # Miss markers
-    miss_onsets = onsets_stim[is_miss] + 0.8
+    miss_onsets = onsets_stim[is_miss] + MAINTENANCE_OFFSET
     if len(miss_onsets) > 0:
         ann += mne.Annotations(miss_onsets, [0.01] * len(miss_onsets),
                                ["resp/miss"] * len(miss_onsets))

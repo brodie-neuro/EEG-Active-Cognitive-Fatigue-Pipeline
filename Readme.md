@@ -29,6 +29,8 @@ The pipeline implements the analysis plan for the Missing Link study (Mangan & K
 ```
 EEG_study_2/
   eeg_pipeline/
+    parameter_gui.py          # Themed parameter editor (tooltips, presets, hash)
+    pipeline_runner_gui.py    # Themed pipeline runner (raw path + preset + live log)
     config/
       study.yml              # Data paths, montage, block definitions
       parameters.json        # All algorithm parameters (single source of truth)
@@ -101,6 +103,54 @@ All analyses compare **Block 1** (baseline) with **Block 5** (fatigued).
 | 16 | `16_merge_features.py` | Merge all feature CSVs into wide format | -- |
 | -- | `visualise_outputs.py` | Per-subject PSD, PAC, ERP, IAF plots | -- |
 | -- | `visualise_group.py` | Group-level paired comparisons & stats | -- |
+
+---
+
+## GUI Workflow (Recommended for Researchers)
+
+The project now includes two connected GUIs for a front-to-back workflow:
+
+1. **Parameter Settings GUI** (`eeg_pipeline/parameter_gui.py`)
+2. **Pipeline Runner GUI** (`eeg_pipeline/pipeline_runner_gui.py`)
+
+### What each GUI does
+
+- `parameter_gui.py`
+  - Edit `parameters.json` with field-level tooltips.
+  - Save/load parameter presets (`eeg_pipeline/config/presets/*.json`).
+  - Shows a parameter hash fingerprint for reproducibility tracking.
+  - Includes a **Run Pipeline** button to open the runner directly.
+
+- `pipeline_runner_gui.py`
+  - Run preprocessing only, analysis only, or full pipeline.
+  - Select raw data folder/pattern/format for the run (runtime override).
+  - Optionally run with a selected preset without overwriting `parameters.json`.
+  - Live step-by-step console log and progress bar.
+  - Includes an **Open Settings** button to return to the parameter GUI.
+
+### Commands
+
+```bash
+# Open parameter settings GUI
+python eeg_pipeline/parameter_gui.py
+
+# Open pipeline runner GUI
+python eeg_pipeline/pipeline_runner_gui.py
+```
+
+### Presets and what actually runs
+
+- Saving a preset creates a JSON file in `eeg_pipeline/config/presets/`.
+- A preset is used only if:
+  1. You load it in the settings GUI and click **Save** (writes to `parameters.json`), or
+  2. You select it in the runner GUI and tick **Use selected preset for this run**.
+
+### Epoching and triggers
+
+Epoching is automatic in Step 07 (`eeg_pipeline/steps/07_epoch.py`):
+- Events are read from annotations.
+- P3b epochs are created from stimulus-onset events.
+- PAC epochs are created from stimulus-onset events shifted by the configured stimulus duration offset.
 
 ---
 
@@ -205,15 +255,89 @@ get_figure_name('p3b_erp')                         # -> 'p3b_erp_filtered.png'
 
 ## Synthetic Data
 
-The fake data generator (`00_make_fake_data.py`) creates realistic 64-channel EEG with:
+### Lay Overview
 
-- **1/f pink noise** background with realistic amplitudes
-- **Oscillatory components**: posterior alpha (~10 Hz), frontal theta (~5.5 Hz), tonic high gamma (65-75 Hz)
-- **Task events**: stimulus onsets (target/nontarget), responses (correct/error/miss)
-- **ERPs**: N1, P2, P3b at posterior sites (targets only)
-- **PAC**: theta-gamma coupling injected during maintenance window (0.8-1.8s post-stimulus)
-- **Artifacts**: blinks (EOG leak), EMG bursts, line noise (50/100 Hz)
-- **Fatigue simulation**: Block 5 has reduced P3b, slower theta, slower alpha, reduced PAC
+The fake data generator (`00_make_fake_data.py`) creates two realistic task blocks:
+
+- **Block 1** = baseline (less fatigued)
+- **Block 5** = fatigued (after cognitive load)
+
+It is designed so the "tired" block looks clearly different from baseline in both behavior and EEG:
+
+- More misses and more errors
+- Slower responses
+- Smaller and later P3b
+- Slower alpha/theta frequencies
+- Lower posterior alpha power
+- Higher frontal theta power
+- Lower frontal->parietal theta-gamma coupling
+
+This gives a practical mock-run dataset that should show the expected direction of effects in output CSVs and plots.
+
+### Technical Summary
+
+Current synthetic generator behavior:
+
+- **Channels**: 64 EEG channels + 4 aux channels (`VEOG`, `HEOG`, `EMG_L`, `EMG_R`)
+- **Timing model**: fixed `STIM_DUR` (0.2 s) and separate maintenance trigger at `MAINTENANCE_OFFSET` (0.8 s)
+- **Event stream**: deterministic-rate target/miss/error assignment (reduced random inversion risk between blocks)
+- **EEG background**: pink 1/f noise + slow drift + line noise (50/100 Hz)
+- **Rhythms**: posterior alpha, fronto-midline theta, tonic high gamma
+- **ERP model**: N1/P2 sensory components + target-only P3b (fatigue reduces amplitude and delays latency)
+- **PAC model**: directed RF theta phase -> RP gamma amplitude coupling in maintenance epochs
+- **Artifact model**: blinks with frontal leak, EMG bursts around responses, EOG/EMG auxiliary channels
+
+Expected fatigue direction for `sub-TEST01` mock runs:
+
+| Measure | Block 5 vs Block 1 |
+|:--------|:-------------------|
+| Misses / errors | Higher |
+| P3b amplitude | Lower |
+| P3b latency | Higher |
+| Theta power (frontal) | Higher |
+| Alpha power (posterior) | Lower |
+| Theta peak frequency (`f_theta`) | Lower |
+| IAF (post vs pre) | Lower |
+| Between-region PAC (`RF->RP`) | Lower |
+
+### Quick Mock-Run Verification Checklist
+
+Run this when you want to confirm the synthetic generator is producing the expected fatigue pattern.
+
+1. Regenerate synthetic data:
+```bash
+python eeg_pipeline/steps/00_make_fake_data.py
+```
+
+2. Run preprocessing + analysis:
+```bash
+python eeg_pipeline/steps/01_import_qc.py
+python eeg_pipeline/steps/02_clean_reference.py
+python eeg_pipeline/steps/04_zapline.py
+python eeg_pipeline/steps/05_ica_iclabel.py
+python eeg_pipeline/steps/06_asr.py
+python eeg_pipeline/steps/07_epoch.py
+python eeg_pipeline/steps/08_autoreject.py
+python eeg_pipeline/analysis/10_erp_p3b.py
+python eeg_pipeline/analysis/11_band_power.py
+python eeg_pipeline/analysis/12_peak_frequencies.py
+python eeg_pipeline/analysis/13_pac_nodal.py
+python eeg_pipeline/analysis/16_merge_features.py
+```
+
+3. Open `eeg_pipeline/outputs/features/merged_wide.csv` and compare `sub-TEST01` Block 5 vs Block 1:
+- `p3b_amp_uV`: lower
+- `p3b_lat_ms`: higher
+- `theta_power_log`: higher
+- `alpha_power_log`: lower
+- `f_theta`: lower
+- `pac_between_RF_RP`: lower
+- `iaf_shift`: negative (post < pre)
+
+4. Open `eeg_pipeline/raw/sub-TEST01_block1-task.vhdr` and `eeg_pipeline/raw/sub-TEST01_block5-task.vhdr` in MNE/BrainVision viewer and confirm:
+- Block 5 has visibly weaker P3b-like positivity at posterior channels
+- Block 5 has higher miss/error event counts
+- Block 5 has slower alpha/theta rhythms
 
 ---
 
@@ -273,6 +397,10 @@ pip install -r requirements.txt
 ## Quick Start
 
 ```bash
+# Optional GUI workflow
+python eeg_pipeline/parameter_gui.py
+python eeg_pipeline/pipeline_runner_gui.py
+
 # 1. Generate synthetic test data
 python eeg_pipeline/steps/00_make_fake_data.py
 
@@ -296,6 +424,27 @@ python eeg_pipeline/analysis/16_merge_features.py
 python eeg_pipeline/analysis/visualise_outputs.py
 python eeg_pipeline/analysis/visualise_group.py
 ```
+
+---
+
+## Testing
+
+Current automated tests:
+
+- `eeg_pipeline/tests/test_step05_ica.py`
+  - Verifies ICA derivative outputs and basic signal integrity.
+- `eeg_pipeline/tests/test_gui_smoke.py`
+  - Smoke tests both GUIs by creating hidden Tk windows and verifying initialization.
+  - Skips automatically when no display server is available.
+
+Run tests:
+
+```bash
+python -m pytest eeg_pipeline/tests/test_gui_smoke.py -q
+python -m pytest eeg_pipeline/tests/test_step05_ica.py -q
+```
+
+Note: There are currently no pixel/screenshot regression tests for GUI appearance.
 
 ---
 

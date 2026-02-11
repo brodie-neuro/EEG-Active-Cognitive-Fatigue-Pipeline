@@ -7,17 +7,24 @@ import sys
 from pathlib import Path
 import mne
 import numpy as np
-from meegkit.dss import dss_line
+try:
+    from meegkit.dss import dss_line
+    MEEGKIT_AVAILABLE = True
+except ImportError:
+    dss_line = None
+    MEEGKIT_AVAILABLE = False
 
 pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
 from src.utils_io import load_config, save_clean_raw, subj_id_from_derivative
 from src.utils_config import get_param
 from src.utils_report import QCReport, qc_psd_overlay
+from src.utils_logging import setup_pipeline_logger
 
 
 def main():
     cfg = load_config()
+    logger = setup_pipeline_logger('04_zapline')
     
     pipeline_root = Path(__file__).resolve().parents[1]
     input_dir = pipeline_root / "outputs" / "derivatives" / "referenced_raw"
@@ -59,6 +66,9 @@ def main():
         
         print("Running Zapline (removing 50Hz)...")
         try:
+            if not MEEGKIT_AVAILABLE:
+                raise ImportError("meegkit not installed")
+
             # Replace any NaNs before processing
             if np.isnan(data).any():
                 print("Warning: NaNs found, replacing with zeros...")

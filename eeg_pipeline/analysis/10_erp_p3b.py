@@ -114,9 +114,10 @@ def main():
                 print(f"  Block {block}: no EEG channels")
                 continue
 
-            # Filter to target trials if available
-            if 'stim/target' in epochs.event_id:
-                target_epochs = epochs['stim/target']
+            # Filter to target trials if available (supports BrainVision "Comment/" prefix)
+            target_keys = [k for k in epochs.event_id.keys() if 'stim/target' in k]
+            if target_keys:
+                target_epochs = epochs[target_keys]
             else:
                 target_epochs = epochs
 

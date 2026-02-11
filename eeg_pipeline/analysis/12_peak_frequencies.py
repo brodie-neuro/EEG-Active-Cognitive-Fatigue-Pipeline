@@ -37,6 +37,35 @@ OUTPUT_DIR = pipeline_dir / "outputs" / "features"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def fallback_peak_from_residual(power, freqs, freq_range):
+    """
+    Estimate peak frequency without specparam by removing an aperiodic trend.
+
+    Fits a linear model in log-log space (1/f proxy), computes residuals,
+    then returns the residual maximum in the requested band.
+    """
+    power = np.asarray(power, dtype=float)
+    freqs = np.asarray(freqs, dtype=float)
+    valid = np.isfinite(power) & np.isfinite(freqs) & (power > 0) & (freqs > 0)
+    if valid.sum() < 5:
+        return np.nan, np.nan
+
+    log_f = np.log10(freqs[valid])
+    log_p = np.log10(power[valid])
+    slope, intercept = np.polyfit(log_f, log_p, 1)
+    fitted = slope * np.log10(freqs) + intercept
+    residual = np.log10(np.clip(power, 1e-20, None)) - fitted
+
+    band_mask = (freqs >= freq_range[0]) & (freqs <= freq_range[1]) & np.isfinite(residual)
+    if band_mask.sum() == 0:
+        return np.nan, -slope
+
+    band_residual = residual[band_mask]
+    band_freqs = freqs[band_mask]
+    peak_idx = int(np.argmax(band_residual))
+    return float(band_freqs[peak_idx]), float(-slope)
+
+
 def extract_peak_frequency(psd_data, freqs, freq_range, cfg):
     """
     Use specparam to extract periodic peak frequency from a power spectrum.
@@ -123,11 +152,7 @@ def extract_iaf(raw, cfg):
         result = extract_peak_frequency(power, freqs, tuple(iaf_band), cfg)
         return result['peak_freq'], result['aperiodic_exponent']
     else:
-        mask = (freqs >= iaf_band[0]) & (freqs <= iaf_band[1])
-        if mask.sum() == 0:
-            return np.nan, np.nan
-        peak_idx = np.argmax(power[mask])
-        return freqs[mask][peak_idx], np.nan
+        return fallback_peak_from_residual(power, freqs, tuple(iaf_band))
 
 
 def extract_theta_freq(epochs, cfg):
@@ -145,11 +170,7 @@ def extract_theta_freq(epochs, cfg):
         result = extract_peak_frequency(power, freqs, tuple(theta_band), cfg)
         return result['peak_freq'], result['aperiodic_exponent']
     else:
-        mask = (freqs >= theta_band[0]) & (freqs <= theta_band[1])
-        if mask.sum() == 0:
-            return np.nan, np.nan
-        peak_idx = np.argmax(power[mask])
-        return freqs[mask][peak_idx], np.nan
+        return fallback_peak_from_residual(power, freqs, tuple(theta_band))
 
 
 def main():

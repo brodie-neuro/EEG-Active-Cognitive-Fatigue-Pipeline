@@ -16,6 +16,7 @@ sys.path.insert(0, str(pipeline_dir))
 from src.utils_io import load_config, save_clean_raw, subj_id_from_derivative
 from src.utils_config import get_param
 from src.utils_report import QCReport
+from src.utils_logging import setup_pipeline_logger
 
 
 def detect_flat_channels(raw, threshold=1e-10):
@@ -49,6 +50,10 @@ def main():
     n_components = get_param('ica', 'n_components', default=25)
     ica_method = get_param('ica', 'method', default='infomax')
     ica_seed = get_param('ica', 'random_state', default=42)
+    ica_fit_hp = float(get_param('ica', 'fit_highpass_hz', default=1.0))
+    if ica_fit_hp <= 0:
+        print(f"Invalid ica.fit_highpass_hz={ica_fit_hp}; defaulting to 1.0 Hz.")
+        ica_fit_hp = 1.0
     iclabel_thresholds = get_param('ica', 'iclabel_thresholds', default={})
     
     # Map ICLabel category names to our config keys
@@ -87,11 +92,11 @@ def main():
             save_clean_raw(raw, output_dir, subj, "ica")
             continue
         
-        # Create 1Hz high-pass copy for ICA fitting
-        print("Filtering copy at 1.0 Hz for ICA fitting...")
+        # Create high-pass copy for ICA fitting (configurable, typically 1.0 Hz)
+        print(f"Filtering copy at {ica_fit_hp:.2f} Hz for ICA fitting...")
         raw_ica_fit = raw.copy()
         raw_ica_fit.pick_types(eeg=True, exclude='bads')
-        raw_ica_fit.filter(l_freq=1.0, h_freq=None, n_jobs=-1, verbose=False)
+        raw_ica_fit.filter(l_freq=ica_fit_hp, h_freq=None, n_jobs=-1, verbose=False)
         
         # Adjust n_components if we have fewer good channels
         n_good_channels = len(raw_ica_fit.ch_names)
@@ -110,9 +115,14 @@ def main():
         
         # ICLabel classification
         print("Running ICLabel classifier...")
-        ic_labels = label_components(raw_ica_fit, ica, method="iclabel")
-        labels = ic_labels["labels"]
-        probs = ic_labels["y_pred_proba"]
+        try:
+            ic_labels = label_components(raw_ica_fit, ica, method="iclabel")
+            labels = ic_labels["labels"]
+            probs = ic_labels["y_pred_proba"]
+        except ImportError as e:
+            print(f"ICLabel unavailable ({e}). Skipping ICA for {subj} and passing through.")
+            save_clean_raw(raw, output_dir, subj, "ica")
+            continue
         
         # Identify artefacts using per-category thresholds from config
         exclude_idx = []
@@ -158,13 +168,14 @@ def main():
         
         qc.log_step('05_ica', status=status,
                      metrics={
-                         'n_components_fit': actual_n_components,
-                         'n_excluded': len(exclude_idx),
-                         'n_brain_remaining': n_brain,
-                         'excluded_indices': str(exclude_idx),
-                     },
+                          'n_components_fit': actual_n_components,
+                          'n_excluded': len(exclude_idx),
+                          'n_brain_remaining': n_brain,
+                          'excluded_indices': str(exclude_idx),
+                      },
                      params_used={'method': ica_method, 'n_components': n_components,
-                                  'thresholds': iclabel_thresholds})
+                                   'fit_highpass_hz': ica_fit_hp,
+                                   'thresholds': iclabel_thresholds})
         qc.save_report()
         
         save_clean_raw(raw_clean, output_dir, subj, "ica")
