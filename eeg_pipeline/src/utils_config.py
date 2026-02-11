@@ -6,12 +6,21 @@ Loads parameters.json (algorithm settings) and study.yml (study design).
 All scripts should use this module rather than hardcoding values.
 """
 import json
+import os
 import yaml
 from pathlib import Path
 
 _CONFIG_DIR = Path(__file__).resolve().parents[1] / "config"
 _PARAMS_CACHE = None
 _STUDY_CACHE = None
+
+
+def _resolve_params_path() -> Path:
+    """Return parameters path, allowing runtime override."""
+    env_path = os.environ.get("EEG_PARAMETERS_PATH")
+    if env_path:
+        return Path(env_path).expanduser().resolve()
+    return _CONFIG_DIR / "parameters.json"
 
 
 def load_parameters(force_reload=False):
@@ -26,7 +35,7 @@ def load_parameters(force_reload=False):
     """
     global _PARAMS_CACHE
     if _PARAMS_CACHE is None or force_reload:
-        params_path = _CONFIG_DIR / "parameters.json"
+        params_path = _resolve_params_path()
         if not params_path.exists():
             raise FileNotFoundError(
                 f"parameters.json not found at {params_path}. "
@@ -133,6 +142,6 @@ def get_blocks():
 def parameters_hash():
     """Return a short hash of the current parameters.json for traceability."""
     import hashlib
-    params_path = _CONFIG_DIR / "parameters.json"
+    params_path = _resolve_params_path()
     content = params_path.read_bytes()
     return hashlib.md5(content).hexdigest()[:8]

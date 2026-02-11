@@ -1,4 +1,5 @@
 # src/utils_io.py
+import os
 import yaml
 import mne
 from pathlib import Path
@@ -10,7 +11,21 @@ def load_config(path: str | None = None):
         base = Path(__file__).resolve().parents[1]        # .../eeg_pipeline
         path = base / "config" / "study.yml"
     with open(path, "r") as f:
-        return yaml.safe_load(f)
+        cfg = yaml.safe_load(f)
+
+    # Optional runtime overrides (used by pipeline runner GUI/CLI).
+    data_cfg = cfg.setdefault("data", {})
+    env_root = os.environ.get("EEG_DATA_ROOT")
+    env_pattern = os.environ.get("EEG_DATA_PATTERN")
+    env_format = os.environ.get("EEG_DATA_FORMAT")
+    if env_root:
+        data_cfg["root"] = env_root
+    if env_pattern:
+        data_cfg["pattern"] = env_pattern
+    if env_format:
+        data_cfg["format"] = env_format
+
+    return cfg
 
 def read_raw(path, fmt, montage):
     """Read a raw EEG file either using an explicit format or auto by extension."""
