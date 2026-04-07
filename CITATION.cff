@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "EEG Active Cognitive Fatigue Pipeline"
+abstract: >-
+  A scripted EEG preprocessing and analysis pipeline for studying
+  active cognitive fatigue using 64-channel EEG. The pipeline
+  quantifies frontoparietal theta-gamma phase-amplitude coupling,
+  theta-band weighted phase lag index, P3b event-related potentials,
+  and frontal midline theta power, with explicit EMG contamination
+  control for gamma-band analyses. Designed for deterministic,
+  reproducible execution across compute environments.
+authors:
+  - family-names: "Mangan"
+    given-names: "Brodie E."
+    affiliation: "University of Stirling"
+    orcid: "https://orcid.org/0000-0000-0000-0000"
+repository-code: "https://github.com/brodie-neuro/EEG-Active-Cognitive-Fatigue-Pipeline"
+license: MIT
+version: "1.0.0"
+date-released: "2026-04-07"
+keywords:
+  - EEG
+  - cognitive fatigue
+  - phase-amplitude coupling
+  - theta-gamma
+  - preprocessing
+  - reproducibility
+  - MNE-Python
