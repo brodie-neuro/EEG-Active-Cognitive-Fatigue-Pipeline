@@ -8,6 +8,7 @@ raw/
 *.set
 *.fdt
 *.edf
+*.cnt
 
 # --- 2. Outputs & Temporary files ---
 outputs/
@@ -16,13 +17,17 @@ __pycache__/
 .idea/
 .venv/
 env/
+*.log
 
-# --- 3. Documentation & Images (Privacy) ---
+# --- 3. Images & Binary docs ---
 *.docx
 *.pdf
 *.png
 *.svg
 *.pptx
+*.jpg
+*.jpeg
+*.tgz
 
 # --- 4. System Files ---
 .DS_Store
@@ -32,26 +37,128 @@ Thumbs.db
 # --- 5. Exclude WAND script (separate repo) ---
 WAND_full_induction.py
 
-# --- 6. Old/superseded analysis plans and removed scripts ---
+# --- 6. Old/superseded scripts and archives ---
 docs/old_analysis/
 docs/v2_plan_text.txt
 eeg_pipeline/analysis/removed/
 archive/
-eeg_pipeline/outputs/analysis_figures/
-eeg_pipeline/outputs/group_figures/
 
 # --- 7. Local development files ---
 ERRORS_AND_FIXES.md
-eeg_pipeline/outputs/logs/
-eeg_pipeline/outputs/qc/
-eeg_pipeline/outputs/reports/
 vis_log.txt
 
 # --- 8. Local datasets and pipeline run artifacts ---
 openneuro_ds004350/
 eeg_pipeline/outputs/
+Raw Data/
+Real Data/
+Behavioural Data/
+real_data/
+pipeline.tgz
+.mne/
+1E-15
 
-# --- 9. Local config artifacts ---
+# --- 9. Secrets & credentials ---
+eeg_pipeline/config/secrets.yaml
+eeg_pipeline/config/app_settings.yaml
 eeg_pipeline/config/backups/
 eeg_pipeline/config/presets/
 eeg_pipeline/config/adapters/*.json
+
+# --- 10. Run logs ---
+eeg_pipeline/*_log.txt
+eeg_pipeline/p1_*.txt
+
+# --- 11. AI / IDE workspace ---
+.claude/
+.gemini/
+
+# --- 12. Manuscript & hypothesis testing (embargoed) ---
+manuscript_draft_1.md
+Manuscript draft 1.docx
+Pipeline_and_Hypotheses_Embargo.md
+eeg_pipeline/hypothesis_testing/
+docs/study_hypotheses_current.md
+docs/methodology_pac_zscore.md
+docs/implementation_plan_qc_framework.md
+
+# --- 13. GUI files (not needed for pipeline execution) ---
+eeg_pipeline/pipeline_runner_gui.py
+eeg_pipeline/parameter_gui.py
+eeg_pipeline/pipeline_reviewer_gui.py
+
+# --- 14. Participant-specific prep scripts (contain real names) ---
+eeg_pipeline/preprocessing/00_prep_*.py
+
+# --- 15. Test artifacts ---
+eeg_pipeline/tests/
+
+# --- 16. Documentation & figures (not pipeline code) ---
+docs/
+
+# --- 17. Visualization & utility scripts ---
+eeg_pipeline/visualization/
+eeg_pipeline/scripts/
+
+# --- 14. Root-level clutter ---
+PRESERVED_ROOT_ITEMS_2026-03-14.md
+VISUALIZATION_REORG_NOTES.md
+rebuild_svgs.py
+rebuild_svgs2.py
+cloud/
+vm_outputs_asr_on/
+vm_asr_on_all_metrics.csv
+consolidate_vm_outputs.py
+
+# --- 15. SSH keys ---
+*.pub
+my_ssh_key*
+
+# --- 16. AI agent review/communication files ---
+REVIEW_FOR_CLAUDE.md
+ASR_CROSS_VM_COMPARISON.md
+REPRODUCIBILITY_REVIEW.md
+PIPELINE_FULL_SOURCE.md
+codex-theta-fix.md
+
+# --- 17. Temporary VM run/debug scripts ---
+run_*.sh
+download_vm_results.sh
+06_epoch_vm.py
+compare_epochs.py
+check_deps.py
+cmp2.txt
+ica_diff.txt
+epoch_compare.txt
+
+# --- 18. Duplicate requirements ---
+requirements_exact.txt
+
+# --- 19. Root-level CSV/debug artifacts ---
+*.csv
+vm*.txt
+vm_*.yml
+vm_*.sh
+write_*.py
+eigendecomp_*.py
+pac_power_sim.py
+zapline_isolation_test.py
+SR_CROSS_VM_COMPARISON.md
+master_comparison_*.md
+
+# --- 20. IDE settings ---
+.vscode/
+
+# --- 21. Old pipeline folders ---
+steps/
+eeg_pipeline/effect_size/
+
+# --- 22. Participant-specific configs (study-specific, not reusable) ---
+eeg_pipeline/config/participant_configs/
+
+# --- 23. Removed pipeline steps and dead code ---
+eeg_pipeline/preprocessing/02_clean_reference.py
+eeg_pipeline/preprocessing/03_zapline.py
+eeg_pipeline/preprocessing/00_migrate_outputs_to_subject_folders.py
+eeg_pipeline/preprocessing/00_view_raw.py
+eeg_pipeline/src/utils_clean.py

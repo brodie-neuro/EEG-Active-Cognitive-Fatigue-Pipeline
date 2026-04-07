@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+env/
+outputs/
+config/secrets.yaml
+*.log
+.DS_Store
+.idea/
+.vscode/

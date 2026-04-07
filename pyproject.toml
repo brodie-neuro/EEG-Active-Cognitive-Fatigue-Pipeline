@@ -1,0 +1,14 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "eeg-active-cognitive-fatigue-pipeline"
+version = "0.1.0"
+description = "Scripted EEG preprocessing and analysis pipeline for the WAND active cognitive fatigue study."
+readme = "Readme.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+  { name = "Brodie E. Mangan" }
+]

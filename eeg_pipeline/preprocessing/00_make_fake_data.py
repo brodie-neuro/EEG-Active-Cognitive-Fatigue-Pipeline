@@ -11,9 +11,10 @@ from mne.channels import make_standard_montage
 from mne.export import export_raw
 
 # ---------------- Tunables ----------------
-SUBJ = "TEST01"
+SUBJ = "FAKE01"
 SFREQ = 500.0
-DURATION_S = 5 * 60  # 5 minutes per block
+N_TRIALS_PER_BLOCK = 161  # WAND protocol: 164 stimuli/block, 162 (2-back) or 161 (3-back) scoreable
+DURATION_S = N_TRIALS_PER_BLOCK * 2.5 + 30  # Approx duration to fit trials + buffer
 
 # "Seated WM task" timing
 TRIAL_ISI_MIN = 2.0
@@ -106,10 +107,12 @@ def pink_noise(n_samples, rng):
     return signal
 
 
-def make_trial_onsets(duration_s, isi_min, isi_max, rng):
+def make_trial_onsets(duration_s, isi_min, isi_max, rng, limit_count=None):
     t = 0.5
     onsets = []
     while t < duration_s - 0.5:
+        if limit_count is not None and len(onsets) >= limit_count:
+            break
         onsets.append(t)
         t += float(rng.uniform(isi_min, isi_max))
     return np.array(onsets, dtype=float)
@@ -197,7 +200,7 @@ def generate_block(block_num, rng):
 
     for i in range(len(eeg_names)):
         base = pink_noise(n_samp, rng)
-        white = rng.normal(0, 0.1, n_samp)
+        white = rng.normal(0, 0.05, n_samp)  # Reduced white noise for cleaner plots
         # Very low noise background so ERPs are pristine
         data[i] = (base + white) * 5e-6 
 
@@ -240,7 +243,8 @@ def generate_block(block_num, rng):
                                       phase=float(rng.uniform(0, 2 * np.pi)))
 
     # ---- Task events ----
-    onsets_stim = make_trial_onsets(DURATION_S, TRIAL_ISI_MIN, TRIAL_ISI_MAX, rng)
+    onsets_stim = make_trial_onsets(DURATION_S, TRIAL_ISI_MIN, TRIAL_ISI_MAX, rng, 
+                                    limit_count=N_TRIALS_PER_BLOCK)
     n_trials = len(onsets_stim)
 
     # Exact-rate masks reduce accidental condition inversions in single-subject mocks

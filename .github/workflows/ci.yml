@@ -1,0 +1,66 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Compile source tree
+        run: python -m compileall -q eeg_pipeline
+
+      - name: Verify runner imports
+        run: python eeg_pipeline/run_pipeline.py --help
+
+      - name: Verify step-module imports
+        run: |
+          python -c "
+          import importlib, sys, pathlib
+          steps = [
+            'eeg_pipeline.preprocessing.01_import_qc',
+            'eeg_pipeline.preprocessing.02_simple_reference',
+            'eeg_pipeline.preprocessing.03_notch_filter',
+            'eeg_pipeline.preprocessing.04_asr',
+            'eeg_pipeline.preprocessing.05_ica_iclabel',
+            'eeg_pipeline.preprocessing.06_epoch',
+            'eeg_pipeline.preprocessing.07_autoreject',
+            'eeg_pipeline.postprocessing.08_erp_p3b',
+            'eeg_pipeline.postprocessing.09_band_power',
+            'eeg_pipeline.postprocessing.10_pac_nodal',
+            'eeg_pipeline.postprocessing.11_theta_wpli',
+            'eeg_pipeline.postprocessing.12_gamma_power',
+            'eeg_pipeline.postprocessing.13_merge_features',
+            'eeg_pipeline.postprocessing.14_preprocessing_qc_summary',
+            'eeg_pipeline.postprocessing.15_theta_stim_specparam',
+            'eeg_pipeline.postprocessing.16_emg_pca_covariates',
+            'eeg_pipeline.postprocessing.17_emg_gamma_regression',
+          ]
+          failed = []
+          for mod in steps:
+              try:
+                  importlib.import_module(mod)
+              except Exception as e:
+                  failed.append(f'{mod}: {e}')
+          if failed:
+              print('IMPORT FAILURES:')
+              for f in failed:
+                  print(f'  {f}')
+              sys.exit(1)
+          print(f'All {len(steps)} step modules imported successfully.')
+          "

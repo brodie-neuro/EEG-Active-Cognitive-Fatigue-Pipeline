@@ -1,33 +1,43 @@
 {
-    "_description": "EEG Pipeline Parameters — Adjust these without editing scripts",
+    "_description": "EEG Pipeline Parameters â€” Adjust these without editing scripts",
     "_version": "1.0.0",
+    "exclude_channels_analysis": {
+        "_doc": "Channels excluded from ROI-based analyses. EMG (F7/FT7, F8/FT8, TP7/TP8) are typed as emg. AF7/AF8 are scalp EEG (not EOG). M1/M2/BVEOG/TVEOG are typed as misc. This list covers frontopolar channels that remain on the scalp but carry residual ocular contamination.",
+        "channels": [
+            "Fp1",
+            "Fp2"
+        ]
+    },
     "filtering": {
         "hp_freq": 0.1,
-        "lp_freq": 120.0,
+        "lp_freq": 100.0,
         "notch_freq": 50.0,
         "notch_width": 2.0
     },
-    "zapline": {
-        "n_harmonics": 4,
-        "chunk_length": 30
+    "asr": {
+        "enabled": true,
+        "cutoff": 30,
+        "_doc_cutoff": "SD threshold for burst rejection. Higher = more conservative (less aggressive). Default in EEGLAB is 20; 30 is more conservative, preserving more original signal and only cleaning extreme bursts.",
+        "method": "euclid",
+        "win_len": 0.5,
+        "use_clean_windows": true,
+        "_doc_clean_windows": "When true, ASR uses clean_windows to automatically select the cleanest calibration segments from the entire block (standard practice). When false, uses first 60s (legacy).",
+        "max_modification_pct": 65.0,
+        "_doc_max_modification": "QC threshold: blocks exceeding this modification rate are flagged for exclusion. Set to 65% to avoid false exclusions across different CPU architectures."
     },
     "ica": {
         "n_components": 25,
         "method": "infomax",
         "random_state": 42,
+        "fit_highpass_hz": 1.0,
         "iclabel_thresholds": {
-            "eye": 0.80,
-            "heart": 0.80,
-            "muscle": 0.90,
+            "eye": 0.85,
+            "heart": 0.85,
+            "muscle": 0.9,
             "channel_noise": 0.95,
             "line_noise": 0.95,
             "other": 0.99
         }
-    },
-    "asr": {
-        "cutoff": 20,
-        "method": "euclid",
-        "win_len": 0.5
     },
     "autoreject": {
         "n_interpolate": [
@@ -45,6 +55,14 @@
         "random_state": 42
     },
     "epoching": {
+        "practice_trim": {
+            "enabled": true,
+            "blocks": [
+                1
+            ],
+            "expected_task_onsets": 164,
+            "max_extra_onsets": 40
+        },
         "p3b": {
             "tmin": -0.2,
             "tmax": 0.8,
@@ -54,54 +72,45 @@
             ]
         },
         "pac": {
-            "stim_duration_offset": 0.8,
-            "tmin": 0.0,
-            "tmax": 1.0,
+            "tmin": -0.5,
+            "tmax": 1.8,
             "baseline": null
         }
     },
     "p3b": {
         "channels": [
-            "Pz"
+            "Pz",
+            "P1",
+            "P2",
+            "POz"
         ],
-        "tmin_peak": 0.300,
-        "tmax_peak": 0.500
+        "tmin_peak": 0.3,
+        "tmax_peak": 0.5
     },
     "specparam": {
         "freq_range": [
-            1,
+            3,
             30
         ],
         "peak_width_limits": [
             1,
-            8
+            6
         ],
         "max_n_peaks": 6,
-        "min_peak_height": 0.1,
-        "aperiodic_mode": "fixed"
+        "min_peak_height": 0.05,
+        "aperiodic_mode": "fixed",
+        "zero_pad_factor": 4
     },
     "band_power": {
         "theta_default": [
             4.0,
             8.0
         ],
-        "alpha_default": [
-            8.0,
-            13.0
-        ],
         "individualized_bandwidth": 2.0,
         "theta_cf_channels": [
             "Fz",
             "FCz",
             "Cz"
-        ],
-        "alpha_posterior_channels": [
-            "Oz",
-            "O1",
-            "O2",
-            "POz",
-            "PO3",
-            "PO4"
         ]
     },
     "pac": {
@@ -113,8 +122,8 @@
             55,
             85
         ],
-        "n_surrogates": 200,
-        "trim": 0.10
+        "n_surrogates": 500,
+        "trim": 0.1
     },
     "iaf": {
         "channels": [
@@ -128,29 +137,60 @@
             "PO8"
         ],
         "search_range": [
-            6.0,
-            14.0
+            8.0,
+            12.0
         ],
         "welch_win": 4.0
     },
     "itf": {
-        "channel": "Fz",
+        "channels": [
+            "Fz",
+            "FCz",
+            "Cz"
+        ],
         "search_range": [
+            4.0,
+            8.0
+        ]
+    },
+    "traditional_peaks": {
+        "welch_win_sec": 12.0,
+        "welch_pad_factor": 4.0,
+        "tfr_win_sec": 12.0,
+        "tfr_step_sec": 6.0,
+        "detrend_1f": true,
+        "plot_log_power": true,
+        "psd_mode": "residual",
+        "maintenance_window_onset": [
+            0.8,
+            1.8
+        ],
+        "maintenance_pad_factor": 8.0,
+        "theta_band": [
             3.0,
             9.0
+        ],
+        "alpha_band": [
+            8.0,
+            12.0
+        ],
+        "beta_band": [
+            13.0,
+            30.0
         ]
     },
     "qc": {
         "max_bad_channels_pct": 10,
         "max_ica_components_rejected": 8,
         "min_brain_ics_remaining": 15,
-        "max_asr_modified_pct": 30,
+        "max_asr_modified_pct": 65,
         "max_epoch_rejection_pct": 30,
-        "min_epochs_per_condition": 20,
+        "min_epochs_per_condition": 50,
         "p3b_latency_range_ms": [
             250,
             600
         ],
-        "p3b_min_amplitude_uv": 0.5
+        "p3b_min_amplitude_uv": 0.5,
+        "min_trials_per_block": 50
     }
 }

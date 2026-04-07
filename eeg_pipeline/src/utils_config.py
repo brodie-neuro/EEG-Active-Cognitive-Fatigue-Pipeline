@@ -30,7 +30,7 @@ def load_parameters(force_reload=False):
     -------
     dict
         Full parameters dictionary. Keys include:
-        filtering, zapline, ica, asr, autoreject, epoching,
+        filtering, notch, ica, asr, autoreject, epoching,
         p3b, specparam, band_power, pac, iaf, itf, qc
     """
     global _PARAMS_CACHE
@@ -98,6 +98,20 @@ def get_param(section, key=None, default=None):
     if key is None:
         return section_data if section_data else default
     return section_data.get(key, default)
+
+
+def require_param(section, key=None):
+    """Return a config value and raise KeyError if it is missing."""
+    params = load_parameters()
+    if section not in params:
+        raise KeyError(f"Missing required config section: '{section}' in parameters.json")
+    if key is None:
+        return params[section]
+    if key not in params[section]:
+        raise KeyError(
+            f"Missing required config key: '{section}.{key}' in parameters.json"
+        )
+    return params[section][key]
 
 
 def get_qc_threshold(metric):

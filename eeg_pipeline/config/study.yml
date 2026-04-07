@@ -1,13 +1,13 @@
 data:
-  format: "brainvision"                   # Brain Products file triplet
-  root: "C:/Users/brodi/PHD/EEG_study_2/eeg_pipeline/raw"
-  pattern: "sub-*_block*-task.vhdr"      # we will write .vhdr + .vmrk + .eeg
+  format: "auto"                          # auto-detect from extension (.vhdr, .fif, .cnt)
+  root: "raw"
+  pattern: "sub-*_block*-task.fif"        # all participant blocks
 
 montage: "standard_1020"                 # 10-20 names like Fz, Pz, Oz
 
 blocks: [1, 5]                           # Blocks to compare (baseline vs fatigued)
 
-behavioral_data: null                    # Path to d' CSV — set when available
+behavioral_data: null                    # Path to d' CSV - set when available
 
 filters:
   hp: 0.1
@@ -17,7 +17,7 @@ filters:
 ica:
   do_ica: true
   n_components: 25
-  eog_channels: []                 # put your EOG labels here if you have them
+  eog_channels: []    # No dedicated EOG — ICLabel handles ocular artefact
 
 epochs:
   # Stimulus-locked epochs (P3b analysis)
@@ -25,10 +25,10 @@ epochs:
     tmin: -0.2
     tmax: 0.8
     baseline: [-0.2, 0.0]
-  # Stimulus-offset-locked epochs (PAC/theta, maintenance period)
+  # PAC/theta epochs: onset-locked with pre-stimulus buffer for filter settling
   pac:
-    tmin: 0.0                      # relative to Trigger 2 (stimulus offset)
-    tmax: 1.0                      # 1 s maintenance window
+    tmin: -0.5                     # 500ms pre-stimulus buffer (ISI data, discarded after filtering)
+    tmax: 1.8                      # covers stimulus (0-0.6s) + maintenance (0.8-1.8s) + trailing buffer
     baseline: null
 
 # Spectral parameterisation (specparam / FOOOF)
@@ -41,27 +41,23 @@ specparam:
 # Phase-amplitude coupling
 pac:
   phase_band: [4, 8]               # theta phase
-  amp_band: [55, 85]               # high gamma amplitude
-  surrogates: 200
+  amp_band: [55, 85]               # high gamma amplitude (30-50 Hz has beta leak, discarded)
+  surrogates: 500
   trim: 0.10                       # 10% trimmed mean
 
-# 9-node structure (64-channel actiCAP layout)
+# Theta extraction node (FM-theta power + ITF)
+# Separate from h1_nodes - covers the frontal midline theta generators
 nodes:
-  LF: ['F7', 'F3', 'FC5']
-  CF: ['Fz', 'FCz', 'Cz']
-  RF: ['F8', 'F4', 'FC6']
-  LC: ['T7', 'C3', 'CP5']
-  CC: ['Cz', 'CPz']
-  RC: ['T8', 'C4', 'CP6']
-  LP: ['P7', 'P3', 'PO7']
-  CP: ['Pz', 'POz']
-  RP: ['P8', 'P4', 'PO8']
+  CF: ['F1', 'Fz', 'F2', 'FCz', 'Cz']
 
-# Regional aggregation (3 regions for inferential models)
-regions:
-  Frontal: ['LF', 'CF', 'RF']
-  Central: ['LC', 'CC', 'RC']
-  Parietal: ['LP', 'CP', 'RP']
+# Revised node structure (PAC pilot rerun, 2026-03-04)
+# C_broad: bilateral frontal->parietal (8+8 channels) - primary
+# Fz->Pz: single-channel descriptive pair - subset of C_broad
+# F_CR/P_CR REMOVED (PAC went wrong direction with fatigue)
+# LF/LP REMOVED (no multiple comparisons needed)
+h1_nodes:
+  C_broad_F: ['Fz', 'FCz', 'F3', 'F4', 'FC1', 'FC2', 'FC3', 'FC4']   # bilateral frontal (8 ch)
+  C_broad_P: ['Pz', 'POz', 'P3', 'P4', 'P1', 'P2', 'PO3', 'PO4']     # bilateral parietal (8 ch)
 
 # Resting-state recordings (eyes-closed, ~3 min each)
 # Pre-fatigue rest recorded BEFORE the 45-min WAND induction
@@ -73,12 +69,12 @@ rest:
 
   # IAF extraction settings (from posterior channels)
   iaf:
-    channels: ["Oz", "O1", "O2", "POz", "PO3", "PO4", "PO7", "PO8"]
+    channels: ["Oz", "O1", "O2", "POz", "PO3", "PO4"]
     band: [6.0, 14.0]
     welch_win: 4.0
 
-  # Individual Theta Frequency (ITF) — task-related, from maintenance epochs
-  # (NOT from rest — extracted in 12_peak_frequencies.py from PAC epochs)
+  # Individual Theta Frequency (ITF) - task-related, from PAC epochs
+  # (NOT from rest - extracted in 12_peak_frequencies.py)
   theta:
     channel: "Fz"
     band: [3.0, 9.0]
