@@ -5,7 +5,6 @@
 
 **Author:** Brodie E. Mangan  
 **Affiliation:** University of Stirling  
-**Status:** Research pipeline under active consolidation for publication
 
 ## Overview
 
