@@ -32,7 +32,7 @@ This pipeline addresses these problems in three ways:
 
 3. **Documented parameter choices.** All major parameters are centralised in config files with written rationale ([PARAMETERS.md](PARAMETERS.md)), separating confirmatory analyses (PAC, wPLI, P3b, frontal midline theta) from descriptive follow-up measures (peak frequency, spectral parameterisation).
 
-The goal is not just another EEG pipeline, but a more auditable, reproducible workflow where preprocessing decisions are visible and their consequences can be evaluated.
+The goal here is not just another EEG pipeline, but a more auditable, reproducible workflow where preprocessing decisions are visible and their consequences can be evaluated.
 
 ## Current Scope
 
@@ -64,13 +64,7 @@ During pipeline validation, we tested reproducibility across multiple GCP VM ins
 
 **Internal validation results:**
 - Same host, repeated runs → byte-identical results
-- Different hosts, same architecture → byte-identical results
 - Cross-architecture (AMD vs Intel) → consistent effect directions and near-identical outputs for matched inputs
-
-Two important caveats:
-
-- Not every scientifically meaningful constant is centralized yet; some analysis-specific settings still live in the scripts themselves.
-- The manuscript can and should carry the full literature-based justification. The repo still needs enough explanation to stand on its own for collaborators, reviewers, and future reuse.
 
 ## Repository Layout
 
