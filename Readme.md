@@ -18,8 +18,6 @@ This repository contains a scripted EEG preprocessing and analysis pipeline for 
 
 The pipeline is written in Python around MNE-Python and related EEG tooling.
 
-The active preprocessing path is a single shared `1-100 Hz` continuous stream. In practice, that means a shared `1 Hz` high-pass preprocessing path: ASR and ICA both run directly on the same incoming stream rather than creating internal fit-only copies.
-
 ## Why This Repo Exists
 
 EEG preprocessing choices can materially alter downstream findings. Different referencing methods, artifact rejection thresholds, and decomposition-based cleaning steps introduce analytical variability that is rarely reported but can change effect sizes, signs, and statistical conclusions.
@@ -166,8 +164,6 @@ Current parameter surface:
 - `eeg_pipeline/config/participant_configs/*.json` (user-created, not shipped): optional per-subject overrides such as known bad channels. Each study creates its own.
 - selected script-level constants in analysis scripts: still part of the live method until consolidated
 
-Autoreject note: `cv` belongs to AutoReject only. The repo uses the library-default `cv=10`; it does not affect ICLabel or ICA classification.
-
 ## Determinism and Runtime Notes
 
 The main runner enforces a deterministic execution profile where possible:
@@ -182,7 +178,7 @@ Practical notes:
 
 - the default public path is `01_import_qc -> 02_simple_reference -> 03_notch_filter -> 04_asr -> 05_ica_iclabel -> 06_epoch -> 07_autoreject`
 - step-level QC logging is part of the primary audit trail
-- ASR and ICA are memory-hungry; 64 GB RAM is a practical minimum, with more headroom recommended for comfortable full-study runs
+- ASR and ICA are memory-hungry; 64 GB RAM is a practical minimum.
 
 ## Installation
 
