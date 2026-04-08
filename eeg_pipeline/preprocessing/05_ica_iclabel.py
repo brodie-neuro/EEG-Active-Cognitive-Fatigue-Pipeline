@@ -1,7 +1,8 @@
-# steps/06_ica_iclabel.py
+# steps/05_ica_iclabel.py
 """
-Step 06: ICA artefact removal using ICLabel classification.
-Fits ICA on a 1 Hz high-pass filtered copy, applies to original data.
+Step 05: ICA artefact removal using ICLabel classification.
+Fits ICA directly on the shared 1 Hz high-pass preprocessing stream, then applies
+the solution back to that same stream.
 """
 import argparse
 import json
@@ -74,8 +75,8 @@ def _run_ica_once(
     raw,
     n_components,
     ica_method,
+    ica_fit_params,
     ica_seed,
-    ica_fit_hp,
     iclabel_thresholds,
     verbose=True,
 ):
@@ -96,8 +97,8 @@ def _run_ica_once(
         "config": {
             "n_components_requested": int(n_components),
             "method": ica_method,
+            "fit_params": dict(ica_fit_params),
             "random_state": int(ica_seed),
-            "fit_highpass_hz": float(ica_fit_hp),
             "thresholds": iclabel_thresholds,
         },
         "runtime_info": get_runtime_info(),
@@ -108,13 +109,6 @@ def _run_ica_once(
 
     raw_ica_fit = raw.copy()
     raw_ica_fit.pick_types(eeg=True, exclude="bads")
-    with threadpool_limit_context():
-        raw_ica_fit.filter(
-            l_freq=ica_fit_hp,
-            h_freq=None,
-            n_jobs=_default_n_jobs(),
-            verbose=False,
-        )
 
     ica_input = raw_ica_fit.get_data()
     n_good_channels = len(raw_ica_fit.ch_names)
@@ -124,6 +118,9 @@ def _run_ica_once(
     diag["ica_input_shape"] = list(ica_input.shape)
     diag["n_good_channels"] = int(n_good_channels)
     diag["n_components_fit"] = int(actual_n_components)
+    is_extended_infomax = (
+        ica_method == "infomax" and bool(ica_fit_params.get("extended", False))
+    )
 
     if actual_n_components < 5:
         raise RuntimeError(
@@ -132,14 +129,23 @@ def _run_ica_once(
         )
 
     if verbose:
-        print(
-            f"Fitting ICA (n={actual_n_components} components on "
-            f"{n_good_channels} channels, method={ica_method})..."
-        )
+        if is_extended_infomax:
+            print(
+                f"Computing Extended Infomax ICA "
+                f"(n={actual_n_components} components on {n_good_channels} channels, "
+                f"method={ica_method}, fit_params={dict(ica_fit_params)})..."
+            )
+        else:
+            print(
+                f"Fitting ICA (n={actual_n_components} components on "
+                f"{n_good_channels} channels, method={ica_method}, "
+                f"fit_params={dict(ica_fit_params)})..."
+            )
 
     ica = ICA(
         n_components=actual_n_components,
         method=ica_method,
+        fit_params=ica_fit_params or None,
         random_state=ica_seed,
         max_iter=500,
     )
@@ -214,7 +220,7 @@ def _run_ica_once(
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Step 06: ICA + ICLabel")
+    parser = argparse.ArgumentParser(description="Step 05: ICA + ICLabel")
     parser.add_argument(
         "--subject",
         type=str,
@@ -253,10 +259,8 @@ def main():
 
     n_components = get_param("ica", "n_components", default=25)
     ica_method = get_param("ica", "method", default="infomax")
+    ica_fit_params = dict(get_param("ica", "fit_params", default={}) or {})
     ica_seed = get_param("ica", "random_state", default=42)
-    ica_fit_hp = float(get_param("ica", "fit_highpass_hz", default=1.0))
-    if ica_fit_hp <= 0:
-        raise ValueError(f"Invalid ica.fit_highpass_hz={ica_fit_hp}; must be > 0.")
     iclabel_thresholds = get_param("ica", "iclabel_thresholds", default={})
 
     for f in files:
@@ -281,8 +285,8 @@ def main():
                     "output_hash": file_sha256(out_file),
                     "parameters_used": {
                         "method": ica_method,
+                        "fit_params": ica_fit_params,
                         "n_components": n_components,
-                        "fit_highpass_hz": ica_fit_hp,
                         "thresholds": iclabel_thresholds,
                         "random_state": ica_seed,
                     },
@@ -301,8 +305,8 @@ def main():
             raw,
             n_components=n_components,
             ica_method=ica_method,
+            ica_fit_params=ica_fit_params,
             ica_seed=ica_seed,
-            ica_fit_hp=ica_fit_hp,
             iclabel_thresholds=iclabel_thresholds,
             verbose=True,
         )
@@ -326,8 +330,8 @@ def main():
                     raw,
                     n_components=n_components,
                     ica_method=ica_method,
+                    ica_fit_params=ica_fit_params,
                     ica_seed=ica_seed,
-                    ica_fit_hp=ica_fit_hp,
                     iclabel_thresholds=iclabel_thresholds,
                     verbose=False,
                 )
@@ -391,7 +395,7 @@ def main():
             status = "WARNING"
 
         qc.log_step(
-            "06_ica",
+            "05_ica",
             status=status,
             metrics={
                 "n_components_fit": summary["n_components_fit"],
@@ -404,8 +408,8 @@ def main():
             },
             params_used={
                 "method": ica_method,
+                "fit_params": ica_fit_params,
                 "n_components": n_components,
-                "fit_highpass_hz": ica_fit_hp,
                 "thresholds": iclabel_thresholds,
                 "random_state": ica_seed,
             },
@@ -425,8 +429,8 @@ def main():
                 "output_hash": file_sha256(out_file),
                 "parameters_used": {
                     "method": ica_method,
+                    "fit_params": ica_fit_params,
                     "n_components": n_components,
-                    "fit_highpass_hz": ica_fit_hp,
                     "thresholds": iclabel_thresholds,
                     "random_state": ica_seed,
                 },

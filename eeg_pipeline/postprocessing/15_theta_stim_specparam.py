@@ -241,18 +241,22 @@ def _welch_psd_per_epoch(epochs, picks, fmin=1, fmax=40,
 # Step 2: SpecParam aperiodic removal
 # ---------------------------------------------------------------------------
 
-def _specparam_aperiodic(power, freqs, fit_range=(2, 40)):
+def _specparam_aperiodic(power, freqs, fit_range=None):
     """Fit SpecParam aperiodic component ONLY. No Gaussian peaks used.
 
     Returns (residual, exponent, aperiodic_fit, r_squared, method).
     Residual is in log10 space: log10(power) - aperiodic_fit.
     """
-    sp_cfg = get_param("specparam", default={})
+    sp_cfg = get_param("specparam", default={}) or {}
+    if fit_range is None:
+        fit_range = sp_cfg.get("freq_range", [3, 30])
+    if len(fit_range) != 2 or fit_range[0] >= fit_range[1]:
+        raise ValueError(f"Invalid specparam.freq_range={fit_range}.")
     sm = SpectralModel(
         peak_width_limits=sp_cfg.get("peak_width_limits", [1, 6]),
         max_n_peaks=sp_cfg.get("max_n_peaks", 6),
         min_peak_height=sp_cfg.get("min_peak_height", 0.05),
-        aperiodic_mode="fixed",
+        aperiodic_mode=sp_cfg.get("aperiodic_mode", "fixed"),
         verbose=False,
     )
 

@@ -18,6 +18,8 @@ This repository contains a scripted EEG preprocessing and analysis pipeline for 
 
 The pipeline is written in Python around MNE-Python and related EEG tooling.
 
+The active preprocessing path is a single shared `1-100 Hz` continuous stream. In practice, that means a shared `1 Hz` high-pass preprocessing path: ASR and ICA both run directly on the same incoming stream rather than creating internal fit-only copies.
+
 ## Why This Repo Exists
 
 EEG preprocessing choices can materially alter downstream findings. Different referencing methods, artifact rejection thresholds, and decomposition-based cleaning steps introduce analytical variability that is rarely reported but can change effect sizes, signs, and statistical conclusions.
@@ -30,7 +32,7 @@ This pipeline addresses these problems in three ways:
 
 2. **Explicit EMG control.** Rather than assuming gamma-band activity is neural, the pipeline includes dedicated EMG channels, PCA-based muscle covariates, and a regression-based exclusion criterion. Blocks where EMG explains more than 25% of gamma variance are flagged for exclusion.
 
-3. **Documented parameter choices.** All major parameters are centralised in config files with written rationale ([PARAMETERS.md](PARAMETERS.md)), separating confirmatory analyses (PAC, wPLI, P3b, frontal midline theta) from descriptive follow-up measures (peak frequency, spectral parameterisation).
+3. **Documented parameter choices.** All major parameters are centralised in config files with written rationale ([PARAMETERS.md](PARAMETERS.md)), separating confirmatory analyses (PAC, wPLI, P3b, fixed-band frontal midline theta) from descriptive follow-up measures (frontal-midline theta peak summaries, spectral parameterisation).
 
 The goal here is not just another EEG pipeline, but a more auditable, reproducible workflow where preprocessing decisions are visible and their consequences can be evaluated.
 
@@ -43,17 +45,25 @@ The main CLI runner currently automates:
 
 Additional postprocessing scripts exist for QC aggregation, spectral parameterisation, and EMG/gamma follow-up analyses (steps 14–17), but they are not currently part of `python eeg_pipeline/run_pipeline.py --mode full`.
 
+For PAC and gamma, `--mode full` is therefore not the final inclusion workflow by itself. Final high-frequency inclusion or exclusion decisions should only be made after running `16_emg_pca_covariates.py` and `17_emg_gamma_regression.py`.
+
 ### Confirmatory vs. Ancillary Analyses
 
 | Type | Steps | Measures |
 |:-----|:------|:---------|
-| **Confirmatory** | 08–11 | P3b amplitude/latency, frontal midline theta power, theta–gamma PAC, theta wPLI |
-| **Descriptive** | 12, 15 | Gamma power, peak frequency (spectral parameterisation) |
+| **Confirmatory** | 08–11 | P3b amplitude/latency, fixed-band frontal midline theta power, fixed 4–8 Hz theta–gamma PAC, theta wPLI |
+| **Descriptive** | 12, 15 | Gamma power, frontal-midline theta peak summaries, spectral parameterisation |
 | **Quality control** | 14, 16, 17 | Preprocessing QC summary, EMG covariates, EMG–gamma regression |
+
+Method hierarchy:
+
+- PAC phase band is fixed at `4-8 Hz`.
+- Frontal midline theta power is fixed-band `4-8 Hz`.
+- Specparam outputs and frontal-midline theta peak summaries are descriptive follow-ups, not required inputs for PAC or fixed-band theta power.
 
 ## Design Principles
 
-- Mostly config-driven: core preprocessing settings and many analysis settings live in `eeg_pipeline/config/parameters.json`.
+- Mostly config-driven: algorithm settings live in `eeg_pipeline/config/parameters.json`, while `eeg_pipeline/config/study.yml` holds study structure, paths, montage, and node definitions.
 - Deterministic by design: fixed seeds, single-threaded numerical execution, and per-step provenance logging are used throughout the main pipeline.
 - EMG-aware: gamma analyses are built around explicit muscle-contamination control rather than assuming high-frequency activity is automatically neural.
 - Explicit method surface: the repo-level parameter rationale is documented in [PARAMETERS.md](PARAMETERS.md).
@@ -114,15 +124,15 @@ EEG_study_2/
 
 | Step | Script | Purpose |
 |:-----|:-------|:--------|
-| 01 | `01_import_qc.py` | import, channel typing, bandpass filtering, initial QC |
+| 01 | `01_import_qc.py` | import, channel typing, shared `1-100 Hz` bandpass filtering, initial QC |
 | 02 | `02_simple_reference.py` | average re-reference (validated as reproducible across hardware) |
 | 03 | `03_notch_filter.py` | FIR notch filter at 50 Hz |
-| 04 | `04_asr.py` | Artifact Subspace Reconstruction (cutoff = 30 SD) |
-| 05 | `05_ica_iclabel.py` | ICA (Infomax) plus ICLabel-based artifact classification |
+| 04 | `04_asr.py` | Artifact Subspace Reconstruction on the shared `1 Hz` high-pass stream (cutoff = 30 SD) |
+| 05 | `05_ica_iclabel.py` | Extended Infomax ICA plus ICLabel-based artifact classification on that same shared `1 Hz` high-pass stream |
 | 06 | `06_epoch.py` | create stimulus-locked epoch sets (P3b and PAC windows) |
 | 07 | `07_autoreject.py` | epoch-level repair and rejection |
 | 08 | `08_erp_p3b.py` | P3b amplitude and latency extraction |
-| 09 | `09_band_power.py` | frontal midline theta power |
+| 09 | `09_band_power.py` | frontal midline theta power (fixed 4-8 Hz) |
 | 10 | `10_pac_nodal.py` | theta–gamma phase-amplitude coupling |
 | 11 | `11_theta_wpli.py` | theta-band weighted phase lag index |
 | 12 | `12_gamma_power.py` | gamma power features |
@@ -134,6 +144,8 @@ EEG_study_2/
 - `15_theta_stim_specparam.py`
 - `16_emg_pca_covariates.py`
 - `17_emg_gamma_regression.py`
+
+`15_theta_stim_specparam.py` is a descriptive frontal-midline theta peak / spectral-parameterisation follow-up and is not required for PAC computation or fixed-band theta-power extraction. By contrast, steps 16 and 17 remain part of the EMG-gating workflow for final PAC and gamma inclusion decisions even though they are not launched by `--mode full`.
 
 ## Parameters and Method Rationale
 
@@ -150,9 +162,11 @@ That file is the right place to answer:
 Current parameter surface:
 
 - `eeg_pipeline/config/parameters.json`: main preprocessing and many analysis parameters
-- `eeg_pipeline/config/study.yml`: study-level paths and structure
+- `eeg_pipeline/config/study.yml`: study-level paths, block structure, montage, and node definitions
 - `eeg_pipeline/config/participant_configs/*.json` (user-created, not shipped): optional per-subject overrides such as known bad channels. Each study creates its own.
 - selected script-level constants in analysis scripts: still part of the live method until consolidated
+
+Autoreject note: `cv` belongs to AutoReject only. The repo uses the library-default `cv=10`; it does not affect ICLabel or ICA classification.
 
 ## Determinism and Runtime Notes
 

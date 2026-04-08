@@ -155,9 +155,9 @@ def main():
                                                            asr_metrics.get('asr_ratio', np.nan))
 
             # --- ICA/ICLabel (step 05/06) ---
-            ica_metrics = _extract_step_metrics(qc_data, '06_ica')
+            ica_metrics = _extract_step_metrics(qc_data, '05_ica')
             if not ica_metrics:
-                ica_metrics = _extract_step_metrics(qc_data, '05_ica')
+                ica_metrics = _extract_step_metrics(qc_data, '06_ica')
             row['n_ics_total'] = ica_metrics.get('n_components', np.nan)
             row['n_ics_excluded'] = ica_metrics.get('n_excluded',
                                                      ica_metrics.get('ICs rejected', np.nan))
@@ -171,9 +171,9 @@ def main():
 
             # --- Autoreject metrics from QC report ---
             for etype in ['p3b', 'pac']:
-                ar_metrics = _extract_step_metrics(qc_data, f'08_autoreject_{etype}')
+                ar_metrics = _extract_step_metrics(qc_data, f'07_autoreject_{etype}')
                 if not ar_metrics:
-                    ar_metrics = _extract_step_metrics(qc_data, f'07_autoreject_{etype}')
+                    ar_metrics = _extract_step_metrics(qc_data, f'08_autoreject_{etype}')
                 out_label = 'stim' if etype == 'pac' else etype
                 if ar_metrics:
                     if f'{out_label}_rejection_pct' not in row or np.isnan(row.get(f'{out_label}_rejection_pct', np.nan)):

@@ -64,7 +64,7 @@ def get_feature_name(feature_type):
     Parameters
     ----------
     feature_type : str
-        Feature key (e.g. 'p3b', 'iaf', 'pac_local', 'merged').
+        Feature key (e.g. 'p3b', 'theta_power', 'pac_local', 'merged').
 
     Returns
     -------

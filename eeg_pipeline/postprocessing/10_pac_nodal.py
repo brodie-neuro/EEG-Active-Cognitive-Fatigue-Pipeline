@@ -35,6 +35,7 @@ pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
 
 from src.utils_io import load_config, discover_subjects
+from src.utils_config import get_param
 from src.utils_determinism import file_sha256, save_step_qc
 from src.utils_features import (
     load_block_epochs, get_subjects_with_blocks,
@@ -706,7 +707,8 @@ def main():
             
             # Canonical theta band (fixed 4-8 Hz)
             pac_cfg = copy.deepcopy(cfg)
-            fixed_band = cfg.get('pac', {}).get('phase_band', [4, 8])
+            pac_cfg['pac'] = copy.deepcopy(get_param('pac', default={}) or {})
+            fixed_band = pac_cfg.get('pac', {}).get('phase_band', [4, 8])
             # Optional runtime override for surrogate count
             env_surr = os.environ.get("EEG_PAC_SURROGATES")
             if env_surr:

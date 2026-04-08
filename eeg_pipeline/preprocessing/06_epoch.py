@@ -1,6 +1,6 @@
-# steps/07_epoch.py
+# steps/06_epoch.py
 """
-Step 07: Epoch creation for P3b and PAC analysis.
+Step 06: Epoch creation for P3b and PAC analysis.
 Creates two separate epoch sets with different time-locking.
 """
 import argparse
@@ -93,7 +93,7 @@ def _trim_practice_onsets(onset_events, block_num: int, practice_cfg: dict):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Step 07: epoch creation")
+    parser = argparse.ArgumentParser(description="Step 06: epoch creation")
     parser.add_argument(
         "--subject",
         type=str,
@@ -206,7 +206,7 @@ def main():
         # QC report
         n_p3b = len(epochs_p3b) if epochs_p3b is not None else 0
         n_pac = len(epochs_pac) if epochs_pac is not None else 0
-        qc.log_step('07_epoch', status='PASS',
+        qc.log_step('06_epoch', status='PASS',
                      metrics={
                           'n_events_total': len(events),
                          'n_onset_events_before_trim': int(practice_meta['before_n']),

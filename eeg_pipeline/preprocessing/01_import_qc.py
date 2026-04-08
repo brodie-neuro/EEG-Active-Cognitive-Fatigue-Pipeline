@@ -162,11 +162,11 @@ def main():
 
         raw.info["bads"] = []
 
-        # 3b) Light filtering (from parameters.json)
+        # 3b) Shared preprocessing bandpass (from parameters.json)
         filt_params = get_param('filtering', default={})
-        hp = filt_params.get('hp_freq', cfg["filters"]["hp"])
-        lp = filt_params.get('lp_freq', cfg["filters"]["lp"])
-        notch = filt_params.get('notch_freq', cfg["filters"]["notch"])
+        hp = float(filt_params.get('hp_freq', 1.0))
+        lp = float(filt_params.get('lp_freq', 100.0))
+        notch = float(filt_params.get('notch_freq', 50.0))
 
         logger.info(
             "Filtering: HP=%.1f, LP=%.1f, Notch=OFF (Step 03 notch filter handles line-noise removal)",

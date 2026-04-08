@@ -2,6 +2,7 @@
 """
 Step 04: Artifact Subspace Reconstruction (ASR) for transient artefact repair.
 Cleans high-amplitude bursts (muscle twitches, head movements) without removing data.
+Runs directly on the shared 1 Hz high-pass preprocessing stream.
 """
 # ─── DETERMINISM: lock BLAS/LAPACK to 1 thread BEFORE numpy/scipy load ───
 # OpenBLAS multi-threading causes non-deterministic floating-point summation
@@ -131,7 +132,6 @@ def _run_asr_once(raw, eeg_picks, sfreq, asr_params, use_clean_windows):
     min_clean_fraction = asr_params.get('min_clean_fraction', 0.25)
     max_bad_chans = asr_params.get('max_bad_chans', 0.1)
     method = asr_params.get('method', 'euclid')
-
     # Transform parameters
     lookahead = asr_params.get('lookahead', 0.25)
     stepsize = asr_params.get('stepsize', 32)
@@ -171,6 +171,10 @@ def _run_asr_once(raw, eeg_picks, sfreq, asr_params, use_clean_windows):
 
     # ─── FIT with diagnostics ───
     diag = {'config': config_used}
+    fit_input = raw.get_data(picks=eeg_picks)
+    diag['fit_source'] = 'shared_input_stream'
+    diag['fit_input_shape'] = list(fit_input.shape)
+    diag['fit_input_hash'] = _array_hash(fit_input)
 
     if use_clean_windows:
         clean_data, sample_mask = asr.fit(

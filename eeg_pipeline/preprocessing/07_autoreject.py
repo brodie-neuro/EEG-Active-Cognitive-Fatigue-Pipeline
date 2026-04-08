@@ -1,6 +1,6 @@
-# steps/08_autoreject.py
+# steps/07_autoreject.py
 """
-Step 08: Autoreject for final epoch-level quality control.
+Step 07: Autoreject for final epoch-level quality control.
 Automatically finds optimal rejection thresholds and repairs bad epochs.
 """
 import argparse
@@ -64,10 +64,12 @@ def _reject_log_payload(reject_log):
 
 def _run_autoreject_once(epochs, ar_params):
     """Run AutoReject once and return output plus deterministic diagnostics."""
+    # `cv` is AutoReject's internal cross-validation fold count only.
+    # It does not affect ICLabel or any ICA component classification logic.
     ar = AutoReject(
         n_interpolate=ar_params.get("n_interpolate", [1, 4, 8, 16]),
         consensus=ar_params.get("consensus", [0.1, 0.5, 1.0]),
-        cv=ar_params.get("cv", 5),
+        cv=ar_params.get("cv", 10),
         random_state=ar_params.get("random_state", 42),
         n_jobs=1,
         verbose=False,
@@ -78,7 +80,7 @@ def _run_autoreject_once(epochs, ar_params):
         "config": {
             "n_interpolate": ar_params.get("n_interpolate", [1, 4, 8, 16]),
             "consensus": ar_params.get("consensus", [0.1, 0.5, 1.0]),
-            "cv": ar_params.get("cv", 5),
+            "cv": ar_params.get("cv", 10),
             "random_state": ar_params.get("random_state", 42),
             "n_jobs": 1,
         },
@@ -114,7 +116,7 @@ def _run_autoreject_once(epochs, ar_params):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Step 08: autoreject")
+    parser = argparse.ArgumentParser(description="Step 07: autoreject")
     parser.add_argument(
         "--subject",
         type=str,

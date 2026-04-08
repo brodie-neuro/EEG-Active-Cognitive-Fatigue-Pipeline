@@ -9,7 +9,7 @@
         ]
     },
     "filtering": {
-        "hp_freq": 0.1,
+        "hp_freq": 1.0,
         "lp_freq": 100.0,
         "notch_freq": 50.0,
         "notch_width": 2.0
@@ -28,8 +28,11 @@
     "ica": {
         "n_components": 25,
         "method": "infomax",
+        "fit_params": {
+            "extended": true
+        },
+        "_doc_fit_params": "Extended Infomax is kept explicit for auditability and reproducibility rather than relying on an implicit default.",
         "random_state": 42,
-        "fit_highpass_hz": 1.0,
         "iclabel_thresholds": {
             "eye": 0.85,
             "heart": 0.85,
@@ -51,7 +54,8 @@
             0.5,
             1.0
         ],
-        "cv": 5,
+        "cv": 10,
+        "_doc_cv": "AutoReject cross-validation folds only. This repo uses the upstream library default of cv=10. This parameter does not affect ICLabel or ICA classification.",
         "random_state": 42
     },
     "epoching": {
@@ -106,7 +110,6 @@
             4.0,
             8.0
         ],
-        "individualized_bandwidth": 2.0,
         "theta_cf_channels": [
             "Fz",
             "FCz",
@@ -124,23 +127,6 @@
         ],
         "n_surrogates": 500,
         "trim": 0.1
-    },
-    "iaf": {
-        "channels": [
-            "Oz",
-            "O1",
-            "O2",
-            "POz",
-            "PO3",
-            "PO4",
-            "PO7",
-            "PO8"
-        ],
-        "search_range": [
-            8.0,
-            12.0
-        ],
-        "welch_win": 4.0
     },
     "itf": {
         "channels": [

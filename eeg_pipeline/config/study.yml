@@ -3,47 +3,14 @@ data:
   root: "raw"
   pattern: "sub-*_block*-task.fif"        # all participant blocks
 
-montage: "standard_1020"                 # 10-20 names like Fz, Pz, Oz
+montage: "standard_1020"                  # 10-20 names like Fz, Pz, Oz
 
-blocks: [1, 5]                           # Blocks to compare (baseline vs fatigued)
+blocks: [1, 5]                            # Blocks to compare (baseline vs fatigued)
 
-behavioral_data: null                    # Path to d' CSV - set when available
+behavioral_data: null                     # Path to d' CSV - set when available
 
-filters:
-  hp: 0.1
-  lp: 120.0
-  notch: 50.0
-
-ica:
-  do_ica: true
-  n_components: 25
-  eog_channels: []    # No dedicated EOG — ICLabel handles ocular artefact
-
-epochs:
-  # Stimulus-locked epochs (P3b analysis)
-  p3b:
-    tmin: -0.2
-    tmax: 0.8
-    baseline: [-0.2, 0.0]
-  # PAC/theta epochs: onset-locked with pre-stimulus buffer for filter settling
-  pac:
-    tmin: -0.5                     # 500ms pre-stimulus buffer (ISI data, discarded after filtering)
-    tmax: 1.8                      # covers stimulus (0-0.6s) + maintenance (0.8-1.8s) + trailing buffer
-    baseline: null
-
-# Spectral parameterisation (specparam / FOOOF)
-specparam:
-  freq_range: [1, 30]
-  peak_width_limits: [1, 8]
-  max_n_peaks: 6
-  min_peak_height: 0.1
-
-# Phase-amplitude coupling
-pac:
-  phase_band: [4, 8]               # theta phase
-  amp_band: [55, 85]               # high gamma amplitude (30-50 Hz has beta leak, discarded)
-  surrogates: 500
-  trim: 0.10                       # 10% trimmed mean
+# Study-level structure only.
+# Algorithm settings live in eeg_pipeline/config/parameters.json.
 
 # Theta extraction node (FM-theta power + ITF)
 # Separate from h1_nodes - covers the frontal midline theta generators
@@ -53,28 +20,8 @@ nodes:
 # Revised node structure (PAC pilot rerun, 2026-03-04)
 # C_broad: bilateral frontal->parietal (8+8 channels) - primary
 # Fz->Pz: single-channel descriptive pair - subset of C_broad
-# F_CR/P_CR REMOVED (PAC went wrong direction with fatigue)
-# LF/LP REMOVED (no multiple comparisons needed)
+# F_CR/P_CR removed (PAC went wrong direction with fatigue)
+# LF/LP removed (no multiple comparisons needed)
 h1_nodes:
   C_broad_F: ['Fz', 'FCz', 'F3', 'F4', 'FC1', 'FC2', 'FC3', 'FC4']   # bilateral frontal (8 ch)
   C_broad_P: ['Pz', 'POz', 'P3', 'P4', 'P1', 'P2', 'PO3', 'PO4']     # bilateral parietal (8 ch)
-
-# Resting-state recordings (eyes-closed, ~3 min each)
-# Pre-fatigue rest recorded BEFORE the 45-min WAND induction
-# Post-fatigue rest recorded AFTER the induction
-# These are separate .vhdr files, not extracted from task blocks
-rest:
-  pattern: "sub-*_rest-*.vhdr"      # e.g. sub-001_rest-pre.vhdr, sub-001_rest-post.vhdr
-  fallback_to_block_raw: true        # If no rest file found, use block ASR raw as proxy
-
-  # IAF extraction settings (from posterior channels)
-  iaf:
-    channels: ["Oz", "O1", "O2", "POz", "PO3", "PO4"]
-    band: [6.0, 14.0]
-    welch_win: 4.0
-
-  # Individual Theta Frequency (ITF) - task-related, from PAC epochs
-  # (NOT from rest - extracted in 12_peak_frequencies.py)
-  theta:
-    channel: "Fz"
-    band: [3.0, 9.0]

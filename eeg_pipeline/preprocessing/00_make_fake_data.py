@@ -41,7 +41,7 @@ FATIGUE = {
     'p3b_latency_shift_s': 0.08,     # Delayed P3b peak
     'theta_freq_shift_hz': -2.2,     # Slower theta
     'theta_amp_scale': 1.55,         # Stronger low-theta power
-    'alpha_freq_shift_hz': -1.0,     # Slower alpha/IAF
+    'alpha_freq_shift_hz': -1.0,     # Slower alpha peak
     'alpha_amp_scale': 0.55,         # Reduced alpha power
     'gamma_tonic_scale': 0.70,       # Slight gamma reduction
     'pac_amp_scale': 0.10,           # Marked PAC reduction
