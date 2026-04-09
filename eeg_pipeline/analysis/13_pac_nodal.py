@@ -1,4 +1,4 @@
-because# eeg_pipeline/analysis/13_pac_nodal.py
+# eeg_pipeline/analysis/13_pac_nodal.py
 """
 Step 13 -- Phase-Amplitude Coupling Analysis (H1)
 
