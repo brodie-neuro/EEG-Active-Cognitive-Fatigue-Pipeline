@@ -564,11 +564,19 @@ def subj_id_from_derivative(fif_path):
     for suffix in ['-raw', '-epo']:
         if suffix in stem:
             stem = stem.rsplit(suffix, 1)[0]    # 'sub-TEST01_block1_cleaned'
-    # Remove the last underscore-separated token (the processing label)
-    parts = stem.rsplit('_', 1)
-    if len(parts) == 2 and parts[1] in (
-        'cleaned', 'referenced', 'notch', 'ica', 'asr',
-        'p3b', 'pac', 'clean'
-    ):
-        return parts[0]                 # 'sub-TEST01_block1'
+    known_labels = (
+        'p3b_erp',
+        'cleaned',
+        'referenced',
+        'notch',
+        'ica',
+        'asr',
+        'p3b',
+        'pac',
+        'clean',
+    )
+    for label in known_labels:
+        token = f"_{label}"
+        if stem.endswith(token):
+            return stem[: -len(token)]
     return stem

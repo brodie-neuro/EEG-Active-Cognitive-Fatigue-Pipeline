@@ -29,35 +29,27 @@ from src.utils_io import (
 )
 from src.utils_determinism import file_sha256, save_step_qc
 from src.utils_logging import setup_pipeline_logger
+from src.utils_report import QCReport
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Step 03 (simple): notch filter 50 Hz")
-    parser.add_argument("--subject", type=str, default="")
-    args = parser.parse_args()
-
-    cfg = load_config()
-    logger = setup_pipeline_logger('03_notch_filter')
-
+def _process_notch_branch(cfg, logger, input_subdir, output_subdir, step_name, branch_label, subject):
     pipeline_root = Path(__file__).resolve().parents[1]
-    out_dir = pipeline_root / "outputs" / "derivatives" / "notch_raw"
+    out_dir = pipeline_root / "outputs" / "derivatives" / output_subdir
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    files = iter_derivative_files("referenced_raw", "*_referenced-raw.fif", subject=args.subject)
+    files = iter_derivative_files(input_subdir, "*_referenced-raw.fif", subject=subject)
     if not files:
-        print("No files found! Make sure Step 02 ran successfully.")
+        logger.info("No files found for %s branch (%s).", branch_label, input_subdir)
         return
 
     for f in files:
         subj = subj_id_from_derivative(f)
-        logger.info("--- Processing %s (NOTCH FILTER) ---", subj)
+        logger.info("--- Processing %s (%s) ---", subj, branch_label)
 
         raw = read_raw(f, fmt="fif", montage=cfg['montage'])
 
-        # Simple notch filter at 50 Hz + harmonics (100 Hz)
-        # Uses FIR filter — pure convolution, no eigendecomposition
         freqs = [50.0, 100.0]
-        logger.info("Applying notch filter at %s Hz...", freqs)
+        logger.info("Applying notch filter at %s Hz (%s)...", freqs, branch_label)
         raw.notch_filter(
             freqs=freqs,
             picks='eeg',
@@ -68,12 +60,24 @@ def main():
 
         block_str = ''.join(c for c in f.stem if c.isdigit())
         block_num = int(block_str[-1]) if block_str else 1
-
-        # Save notch-filtered output
         out_file = save_clean_raw(raw, out_dir, subj, "notch")
 
+        qc = QCReport(subj, block_num)
+        qc.log_step(
+            step_name,
+            status="PASS",
+            metrics={
+                "method": "notch_fir",
+                "freqs_removed": str(freqs),
+            },
+            params_used={"method": "notch_fir", "freqs_hz": freqs, "branch": branch_label},
+            input_file=str(f),
+            output_file=out_file,
+        )
+        qc.save_report()
+
         step_qc_path = save_step_qc(
-            "03_notch_filter",
+            step_name,
             subj,
             block_num,
             {
@@ -85,15 +89,44 @@ def main():
                 "parameters_used": {
                     "method": "notch_fir",
                     "freqs_hz": freqs,
+                    "branch": branch_label,
                 },
                 "step_specific": {
                     "method": "notch_fir",
                     "freqs_removed": freqs,
-                    "note": "Simple FIR notch filter, fully deterministic across hardware",
+                    "note": "Simple FIR notch filter, deterministic across hardware",
                 },
             },
         )
+        logger.info("Saved step QC log: %s", step_qc_path)
         logger.info("Saved %s", out_file)
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Step 03 (simple): notch filter 50 Hz")
+    parser.add_argument("--subject", type=str, default="")
+    args = parser.parse_args()
+
+    cfg = load_config()
+    logger = setup_pipeline_logger('03_notch_filter')
+    _process_notch_branch(
+        cfg,
+        logger,
+        input_subdir="referenced_raw",
+        output_subdir="notch_raw",
+        step_name="03_notch_filter",
+        branch_label="main_oscillatory_path",
+        subject=args.subject,
+    )
+    _process_notch_branch(
+        cfg,
+        logger,
+        input_subdir="erp_referenced_raw",
+        output_subdir="erp_notch_raw",
+        step_name="03_notch_filter_erp",
+        branch_label="erp_p3b_branch",
+        subject=args.subject,
+    )
 
     logger.info("Step 03 (notch) complete.")
 

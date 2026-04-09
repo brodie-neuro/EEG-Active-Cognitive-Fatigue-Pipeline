@@ -30,7 +30,7 @@ def load_parameters(force_reload=False):
     -------
     dict
         Full parameters dictionary. Keys include:
-        filtering, notch, ica, asr, autoreject, epoching,
+        filtering, erp_branch, notch, ica, asr, autoreject, epoching,
         p3b, specparam, band_power, pac, itf, qc
     """
     global _PARAMS_CACHE

@@ -92,6 +92,27 @@ def _trim_practice_onsets(onset_events, block_num: int, practice_cfg: dict):
     return trimmed, meta
 
 
+def _prepare_epoch_inputs(raw, cfg: dict):
+    """Return events, mapped event ids, and stimulus-onset rows for epoching."""
+    events, event_id = mne.events_from_annotations(raw)
+    mapped_event_id = map_event_id_labels(event_id, cfg.get('adapter', {}))
+    if mapped_event_id != event_id:
+        print("Applied adapter event label mapping.")
+        event_id = mapped_event_id
+
+    if not any("stim" in str(k).lower() for k in event_id):
+        default_map = {"1": "stim", "2": "stim/offset"}
+        event_id = {default_map.get(str(k), str(k)): v for k, v in event_id.items()}
+        print(f"Applied default WAND event mapping: {event_id}")
+
+    if len(events) == 0:
+        raise RuntimeError("No events found; cannot epoch data.")
+
+    stim_events = _require_onset_events(event_id)
+    onset_event_rows = _select_onset_event_rows(events, stim_events)
+    return events, event_id, stim_events, onset_event_rows
+
+
 def main():
     parser = argparse.ArgumentParser(description="Step 06: epoch creation")
     parser.add_argument(
@@ -108,6 +129,9 @@ def main():
     pipeline_root = Path(__file__).resolve().parents[1]
     input_dir = pipeline_root / "outputs" / "derivatives" / "ica_cleaned_raw"
     output_dir = pipeline_root / "outputs" / "derivatives" / "epochs"
+    erp_branch_cfg = get_param("erp_branch", default={}) or {}
+    erp_branch_enabled = bool(erp_branch_cfg.get("enabled", False))
+    erp_epoch_type = str(erp_branch_cfg.get("epoch_type", "p3b_erp"))
 
     if not input_dir.exists():
         print(f"Legacy input directory not found: {input_dir}. Trying per-subject layout.")
@@ -124,24 +148,10 @@ def main():
         subj_epochs_dir.mkdir(parents=True, exist_ok=True)
         epochs_p3b = None
         epochs_pac = None
+        epochs_p3b_erp = None
         
         raw = mne.io.read_raw_fif(f, preload=True)
-        events, event_id = mne.events_from_annotations(raw)
-        mapped_event_id = map_event_id_labels(event_id, cfg.get('adapter', {}))
-        if mapped_event_id != event_id:
-            print("Applied adapter event label mapping.")
-            event_id = mapped_event_id
-
-        # Default WAND trigger mapping: 1 = stimulus onset, 2 = stimulus offset
-        # Applied when adapter mapping didn't produce 'stim' labels.
-        # In the WAND task every stimulus is a target requiring a response.
-        if not any("stim" in str(k).lower() for k in event_id):
-            default_map = {"1": "stim", "2": "stim/offset"}
-            event_id = {default_map.get(str(k), str(k)): v for k, v in event_id.items()}
-            print(f"Applied default WAND event mapping: {event_id}")
-        
-        if len(events) == 0:
-            raise RuntimeError(f"No events found for {subj}; cannot epoch data.")
+        events, event_id, stim_events, onset_event_rows = _prepare_epoch_inputs(raw, cfg)
         
         # Extract block number for QC
         block_str = ''.join(c for c in f.stem if c.isdigit())
@@ -158,8 +168,6 @@ def main():
         # P3b Epochs: Stimulus ONSET locked only (Trigger 1), -200 to +800 ms
         # Exclude stim/offset events (Trigger 2) -- those mark end of stimulus
         print("Creating P3b epochs (stimulus-onset-locked)...")
-        stim_events = _require_onset_events(event_id)
-        onset_event_rows = _select_onset_event_rows(events, stim_events)
         onset_event_rows, practice_meta = _trim_practice_onsets(
             onset_event_rows, block_num, practice_cfg
         )
@@ -182,6 +190,42 @@ def main():
         p3b_out = subj_epochs_dir / f"{subj}_p3b-epo.fif"
         epochs_p3b.save(p3b_out, overwrite=True)
         print(f"  P3b epochs: {len(epochs_p3b)} trials")
+
+        if erp_branch_enabled:
+            erp_raw_path = subject_derivatives_dir(subj, "erp_notch_raw") / f"{subj}_notch-raw.fif"
+            if not erp_raw_path.exists():
+                raise FileNotFoundError(
+                    f"ERP branch is enabled but no ERP-notch file was found for {subj}: {erp_raw_path}"
+                )
+
+            print("Creating ERP-branch P3b epochs from dedicated 0.1 Hz stream...")
+            raw_erp = mne.io.read_raw_fif(erp_raw_path, preload=True)
+            _, event_id_erp, stim_events_erp, onset_event_rows_erp = _prepare_epoch_inputs(raw_erp, cfg)
+            onset_event_rows_erp, practice_meta_erp = _trim_practice_onsets(
+                onset_event_rows_erp, block_num, practice_cfg
+            )
+            if practice_meta_erp["applied"]:
+                print(
+                    f"  ERP branch trimmed {practice_meta_erp['dropped_n']} prepended practice onset trials "
+                    f"from block {block_num}; keeping final {practice_meta_erp['after_n']} task onsets."
+                )
+            epochs_p3b_erp = mne.Epochs(
+                raw_erp,
+                onset_event_rows_erp,
+                stim_events_erp,
+                tmin=p3b_tmin,
+                tmax=p3b_tmax,
+                baseline=p3b_baseline,
+                preload=True,
+                reject=None,
+                verbose=False,
+            )
+            p3b_erp_out = subj_epochs_dir / f"{subj}_{erp_epoch_type}-epo.fif"
+            epochs_p3b_erp.save(p3b_erp_out, overwrite=True)
+            print(f"  P3b ERP-branch epochs: {len(epochs_p3b_erp)} trials")
+        else:
+            p3b_erp_out = None
+            practice_meta_erp = None
         
         # PAC Epochs:
         # Stimulus-ONSET locked, with pre-stimulus buffer for filter settling.
@@ -206,6 +250,7 @@ def main():
         # QC report
         n_p3b = len(epochs_p3b) if epochs_p3b is not None else 0
         n_pac = len(epochs_pac) if epochs_pac is not None else 0
+        n_p3b_erp = len(epochs_p3b_erp) if epochs_p3b_erp is not None else 0
         qc.log_step('06_epoch', status='PASS',
                      metrics={
                           'n_events_total': len(events),
@@ -213,9 +258,21 @@ def main():
                          'n_onset_events_after_trim': int(practice_meta['after_n']),
                          'n_practice_onsets_dropped': int(practice_meta['dropped_n']),
                          'n_p3b_epochs': n_p3b,
+                         'n_p3b_erp_epochs': n_p3b_erp,
                          'n_pac_epochs': n_pac,
                       })
         qc.save_report()
+        output_file = {
+            "p3b": str(p3b_out),
+            "pac": str(pac_out),
+        }
+        output_hash = {
+            "p3b": file_sha256(p3b_out),
+            "pac": file_sha256(pac_out),
+        }
+        if p3b_erp_out is not None:
+            output_file["p3b_erp"] = str(p3b_erp_out)
+            output_hash["p3b_erp"] = file_sha256(p3b_erp_out)
         step_qc_path = save_step_qc(
             "06_epoch",
             subj,
@@ -224,25 +281,27 @@ def main():
                 "status": "PASS",
                 "input_file": str(f),
                 "input_hash": file_sha256(f),
-                "output_file": [str(p3b_out), str(pac_out)],
-                "output_hash": {
-                    "p3b": file_sha256(p3b_out),
-                    "pac": file_sha256(pac_out),
-                },
+                "output_file": output_file,
+                "output_hash": output_hash,
                 "parameters_used": {
                     "p3b": p3b_cfg,
                     "pac": pac_cfg_params,
+                    "erp_branch": erp_branch_cfg if erp_branch_enabled else None,
                 },
                 "step_specific": {
                     "n_epochs": {
                         "p3b": int(n_p3b),
+                        "p3b_erp": int(n_p3b_erp),
                         "pac": int(n_pac),
                     },
                     "practice_trim": practice_meta,
+                    "practice_trim_erp": practice_meta_erp,
                     "event_id_map": event_id,
                     "event_id_hash": stable_json_hash(event_id),
                     "tmin": {"p3b": p3b_tmin, "pac": pac_tmin},
                     "tmax": {"p3b": p3b_tmax, "pac": pac_tmax},
+                    "erp_epoch_type": erp_epoch_type if erp_branch_enabled else None,
+                    "erp_event_id_map": event_id_erp if erp_branch_enabled else None,
                 },
             },
         )

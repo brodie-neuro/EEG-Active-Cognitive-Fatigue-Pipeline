@@ -3,11 +3,11 @@
 P3b ERP Analysis
 
 Extracts P3b amplitude (300-500 ms) and peak latency from target trials
-at centroparietal electrodes (CP node). Outputs long format:
+at centroparietal electrodes. Outputs long format:
 one row per subject x block.
 
-Also exports an earlier positivity metric (P250; 220-280 ms) so both
-early and late positive windows can be tracked in N-back data.
+Uses the dedicated low-cut ERP branch (`p3b_erp`) so conservative P3b
+estimation does not alter the main 1 Hz oscillatory pipeline.
 
 Reference: post_processing_EEG_plan_v2.docx, Step 1
 """
@@ -45,7 +45,6 @@ FIG_DIR.mkdir(parents=True, exist_ok=True)
 # -- Plotting constants --
 _CLR_B1 = '#1E88E5'
 _CLR_B5 = '#E53935'
-_CLR_P250 = '#FFA726'
 _CLR_P3B = '#4CAF50'
 _STAT_BOX = dict(boxstyle='round,pad=0.4', facecolor='#ECEFF1', edgecolor='#B0BEC5')
 
@@ -76,11 +75,8 @@ def _plot_erp_diagnostic(subj, block_erps, times_ms):
     erp0 = block_erps[first_block]['erp']
     feat0 = block_erps[first_block]['features']
 
-    # --- Left: ERP waveform with P250 + P3b windows ---
+    # --- Left: ERP waveform with P3b window ---
     ax_erp.plot(times_ms, erp0, 'k-', lw=1.5, label='Grand avg')
-    # Shade P250 window (orange)
-    ax_erp.axvspan(P250_TMIN * 1000, P250_TMAX * 1000, alpha=0.2, color=_CLR_P250, label='P250 window')
-    # Shade P3b window (green)
     ax_erp.axvspan(P3B_TMIN * 1000, P3B_TMAX * 1000, alpha=0.2, color=_CLR_P3B, label='P3b window')
     # Diamond at P3b peak
     if not np.isnan(feat0['p3b_latency_ms']):
@@ -151,11 +147,11 @@ def _plot_erp_diagnostic(subj, block_erps, times_ms):
 
 
 # P3b parameters from config
+_erp_branch_cfg = get_param('erp_branch', default={}) or {}
+ERP_EPOCH_TYPE = _erp_branch_cfg.get('epoch_type', 'p3b_erp')
 _p3b_cfg = get_param('p3b', default={})
 P3B_TMIN = _p3b_cfg.get('tmin_peak', 0.300)
 P3B_TMAX = _p3b_cfg.get('tmax_peak', 0.500)
-P250_TMIN = _p3b_cfg.get('tmin_p250', 0.220)
-P250_TMAX = _p3b_cfg.get('tmax_p250', 0.280)
 P3B_CHANNELS = _p3b_cfg.get('channels', ['Pz'])
 
 
@@ -171,8 +167,7 @@ def extract_p3b(epochs, ch_picks=None):
 
     Returns
     -------
-    dict with P3 (300-500 ms) and P250 (220-280 ms) features.
-    Includes both mean-window amplitude and peak positivity amplitude.
+    dict with P3b mean-window amplitude and peak positivity amplitude.
     """
     if ch_picks is None:
         ch_picks = P3B_CHANNELS
@@ -200,17 +195,12 @@ def extract_p3b(epochs, ch_picks=None):
         return mean_uv, peak_uv, lat_ms
 
     p3b_mean, p3b_peak, p3b_lat = _window_features(P3B_TMIN, P3B_TMAX)
-    p250_mean, p250_peak, p250_lat = _window_features(P250_TMIN, P250_TMAX)
 
     return {
         'p3b_amplitude_uV': p3b_mean,  # legacy key (mean window amplitude)
         'p3b_mean_uV': p3b_mean,
         'p3b_peak_uV': p3b_peak,
         'p3b_latency_ms': p3b_lat,
-        'p250_amplitude_uV': p250_mean,  # legacy key (mean window amplitude)
-        'p250_mean_uV': p250_mean,
-        'p250_peak_uV': p250_peak,
-        'p250_latency_ms': p250_lat,
         '_erp_uV': erp * 1e6,   # full ERP waveform in µV (for diagnostics)
         '_times_ms': times * 1000,  # time vector in ms
         '_trial_data': data.mean(axis=1),  # (n_trials, n_times) channel-averaged
@@ -227,17 +217,17 @@ def main():
     blocks = cfg.get('blocks', [1, 5])
     epochs_dir = pipeline_dir / "outputs" / "derivatives" / "epochs_clean"
 
-    subjects = get_subjects_with_blocks(epochs_dir, 'p3b', blocks)
+    subjects = get_subjects_with_blocks(epochs_dir, ERP_EPOCH_TYPE, blocks)
     if not subjects:
         subjects = discover_subjects(
             epochs_dir=epochs_dir,
             blocks=blocks,
-            epoch_type='p3b',
+            epoch_type=ERP_EPOCH_TYPE,
             require_all_blocks=False,
         )
 
     if not subjects:
-        print("No P3b epoch files found.")
+        print(f"No {ERP_EPOCH_TYPE} epoch files found.")
         return
 
     rows = []
@@ -247,7 +237,7 @@ def main():
         block_erps = {}  # accumulate for diagnostic figure
 
         for block in blocks:
-            epochs = load_block_epochs(subj, block, 'p3b', epochs_dir)
+            epochs = load_block_epochs(subj, block, ERP_EPOCH_TYPE, epochs_dir)
             if epochs is None:
                 print(f"  Block {block}: no data")
                 continue
@@ -271,14 +261,9 @@ def main():
                 'p3b_mean_uV': p3b['p3b_mean_uV'],
                 'p3b_peak_uV': p3b['p3b_peak_uV'],
                 'p3b_lat_ms': p3b['p3b_latency_ms'],
-                'p250_amp_uV': p3b['p250_amplitude_uV'],
-                'p250_mean_uV': p3b['p250_mean_uV'],
-                'p250_peak_uV': p3b['p250_peak_uV'],
-                'p250_lat_ms': p3b['p250_latency_ms'],
             })
             print(
                 f"  Block {block}: "
-                f"P250 mean={p3b['p250_mean_uV']:.2f} uV, peak={p3b['p250_peak_uV']:.2f} uV @ {p3b['p250_latency_ms']:.0f} ms | "
                 f"P3 mean={p3b['p3b_mean_uV']:.2f} uV, peak={p3b['p3b_peak_uV']:.2f} uV @ {p3b['p3b_latency_ms']:.0f} ms"
             )
 

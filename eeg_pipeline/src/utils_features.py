@@ -82,7 +82,7 @@ def load_block_epochs(subj, block, epoch_type, epochs_dir):
     block : int
         Block number (e.g., 1 or 5).
     epoch_type : str
-        'p3b' or 'pac'.
+        'p3b', 'p3b_erp', or 'pac'.
     epochs_dir : Path
         Directory containing epoch files.
 

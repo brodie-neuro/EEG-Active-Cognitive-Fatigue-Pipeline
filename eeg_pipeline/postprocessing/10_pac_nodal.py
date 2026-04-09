@@ -625,26 +625,6 @@ def _modulation_index(theta_phase, gamma_amp, n_bins=12, return_details=False):
 # compute_pac dispatcher REMOVED — _pac_from_precomputed() is the sole PAC path.
 # No tensorpac dependency and no alternate PAC path. Fully deterministic.
 
-
-
-
-def load_individual_peaks(output_dir):
-    """Load individual theta (ITF) peak frequencies.
-    
-    Returns
-    -------
-    itf_map : dict  {(subject, block): f_theta}
-    """
-    itf_map = {}
-    feat_file = output_dir / "theta_freq_features.csv"
-    if feat_file.exists():
-        df = pd.read_csv(feat_file)
-        itf_map = {(row['subject'], row['block']): row['f_theta']
-                   for _, row in df.iterrows() if not np.isnan(row['f_theta'])}
-
-    return itf_map
-
-
 def main():
     parser = argparse.ArgumentParser(description='PAC analysis')
     parser.add_argument('--no-plots', action='store_true', help='Skip diagnostic figures')
@@ -654,14 +634,6 @@ def main():
     cfg = load_config()
     blocks = cfg.get('blocks', [1, 5])
     epochs_dir = pipeline_dir / "outputs" / "derivatives" / "epochs_clean"
-    features_dir = pipeline_dir / "outputs" / "features"
-
-    # Load Individual Peak Frequencies
-    itf_map = load_individual_peaks(features_dir)
-    if itf_map:
-        print(f"Loaded {len(itf_map)} individual theta peaks (descriptive only).")
-    else:
-        print("No individual theta peaks found.")
 
     subjects = get_subjects_with_blocks(epochs_dir, 'pac', blocks)
     if not subjects:
@@ -709,10 +681,6 @@ def main():
             pac_cfg = copy.deepcopy(cfg)
             pac_cfg['pac'] = copy.deepcopy(get_param('pac', default={}) or {})
             fixed_band = pac_cfg.get('pac', {}).get('phase_band', [4, 8])
-            # Optional runtime override for surrogate count
-            env_surr = os.environ.get("EEG_PAC_SURROGATES")
-            if env_surr:
-                pac_cfg.setdefault('pac', {})['surrogates'] = int(env_surr)
             
             print(f'  Theta Band: {fixed_band[0]}-{fixed_band[1]} Hz (canonical)')
             print(f"  PAC analysis window (post-filter crop): {PAC_ANALYSIS_WINDOW[0]:.1f}-{PAC_ANALYSIS_WINDOW[1]:.1f} s")

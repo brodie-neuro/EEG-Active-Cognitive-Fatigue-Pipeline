@@ -1,5 +1,5 @@
 {
-    "_description": "EEG Pipeline Parameters â€” Adjust these without editing scripts",
+    "_description": "EEG Pipeline Parameters - Adjust these without editing scripts",
     "_version": "1.0.0",
     "exclude_channels_analysis": {
         "_doc": "Channels excluded from ROI-based analyses. EMG (F7/FT7, F8/FT8, TP7/TP8) are typed as emg. AF7/AF8 are scalp EEG (not EOG). M1/M2/BVEOG/TVEOG are typed as misc. This list covers frontopolar channels that remain on the scalp but carry residual ocular contamination.",
@@ -13,6 +13,12 @@
         "lp_freq": 100.0,
         "notch_freq": 50.0,
         "notch_width": 2.0
+    },
+    "erp_branch": {
+        "enabled": true,
+        "hp_freq": 0.1,
+        "epoch_type": "p3b_erp",
+        "_doc": "Dedicated low-cut ERP branch for conservative P3b estimation only. It does not feed ASR, ICA, PAC, theta power, theta wPLI, gamma, or specparam outputs."
     },
     "asr": {
         "enabled": true,

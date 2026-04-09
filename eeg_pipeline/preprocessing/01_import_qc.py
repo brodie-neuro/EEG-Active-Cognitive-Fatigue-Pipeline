@@ -90,8 +90,9 @@ def main():
     qc_json_dir = pipeline_root / "outputs" / "qc_reports"
     qc_png_dir = pipeline_root / "outputs" / "qc_figs"
     out_clean_dir = pipeline_root / "outputs" / "derivatives" / "cleaned_raw"
+    out_erp_clean_dir = pipeline_root / "outputs" / "derivatives" / "erp_cleaned_raw"
 
-    for d in [qc_json_dir, qc_png_dir, out_clean_dir]:
+    for d in [qc_json_dir, qc_png_dir, out_clean_dir, out_erp_clean_dir]:
         d.mkdir(parents=True, exist_ok=True)
 
     # 3) Loop over files
@@ -167,22 +168,34 @@ def main():
         hp = float(filt_params.get('hp_freq', 1.0))
         lp = float(filt_params.get('lp_freq', 100.0))
         notch = float(filt_params.get('notch_freq', 50.0))
+        erp_cfg = get_param('erp_branch', default={}) or {}
+        erp_enabled = bool(erp_cfg.get('enabled', False))
+        erp_hp = float(erp_cfg.get('hp_freq', 0.1))
 
         logger.info(
             "Filtering: HP=%.1f, LP=%.1f, Notch=OFF (Step 03 notch filter handles line-noise removal)",
             hp, lp
         )
-        raw = basic_filters(raw, hp, lp, None)
+        raw_main = basic_filters(raw.copy(), hp, lp, None)
+        raw_erp = None
+        if erp_enabled:
+            logger.info(
+                "ERP branch filtering: HP=%.1f, LP=%.1f, Notch=OFF (dedicated P3b branch only)",
+                erp_hp, lp
+            )
+            raw_erp = basic_filters(raw.copy(), erp_hp, lp, None)
 
         # 3c) Automatic bad channel suggestion
         # Note: This function only looks at 'eeg' channels now.
         # Since we changed EMG_L to type 'emg' above, it will be IGNORED here.
-        bads = find_bad_channels(raw)
-        raw.info["bads"] = bads
+        bads = find_bad_channels(raw_main)
+        raw_main.info["bads"] = bads
+        if raw_erp is not None:
+            raw_erp.info["bads"] = list(bads)
         logger.info("Bad EEG channels found: %s", bads)
 
         # 3d) Save QC figures (will show EMG at bottom)
-        save_qc_figures(raw, qc_png_dir, subj)
+        save_qc_figures(raw_main, qc_png_dir, subj)
 
         # 3e) Save JSON Report
         rep = {
@@ -199,31 +212,35 @@ def main():
         block_num = int(block_str[-1]) if block_str else 1
         qc = QCReport(subj, block_num)
 
-        n_eeg = len(mne.pick_types(raw.info, eeg=True))
+        n_eeg = len(mne.pick_types(raw_main.info, eeg=True))
         bad_pct = 100 * len(bads) / n_eeg if n_eeg > 0 else 0
         status = qc.assess_metric('Bad channels %', bad_pct,
                                   'max_bad_channels_pct', '<=')
         try:
-            events, _ = mne.events_from_annotations(raw, verbose=False)
+            events, _ = mne.events_from_annotations(raw_main, verbose=False)
             n_events = len(events)
         except Exception:
             n_events = 0
 
-        out_file = save_clean_raw(raw, out_clean_dir, subj, "cleaned")
+        out_file = save_clean_raw(raw_main, out_clean_dir, subj, "cleaned")
+        erp_out_file = None
+        if raw_erp is not None:
+            erp_out_file = save_clean_raw(raw_erp, out_erp_clean_dir, subj, "cleaned")
 
         qc.log_step('01_import', status=status,
                      metrics={
-                         'n_channels': len(raw.ch_names),
+                         'n_channels': len(raw_main.ch_names),
                          'n_eeg_channels': n_eeg,
                          'n_bad_channels': len(bads),
                          'bad_channels': str(bads),
                          'bad_pct': round(bad_pct, 1),
                          'n_events': n_events,
-                         'duration_s': round(raw.times[-1], 1),
-                         'sfreq': raw.info['sfreq'],
+                         'duration_s': round(raw_main.times[-1], 1),
+                         'sfreq': raw_main.info['sfreq'],
                      },
                      params_used={
-                         'hp': hp,
+                         'hp_main': hp,
+                         'hp_erp': erp_hp if erp_enabled else None,
                          'lp': lp,
                          'notch_requested_hz': notch,
                      },
@@ -242,22 +259,29 @@ def main():
                 "output_file": str(out_file),
                 "output_hash": file_sha256(out_file),
                 "parameters_used": {
-                    'hp': hp,
+                    'hp_main': hp,
+                    'hp_erp': erp_hp if erp_enabled else None,
                     'lp': lp,
                     'notch_requested_hz': notch,
                 },
                 "step_specific": {
-                    "channel_count": len(raw.ch_names),
+                    "channel_count": len(raw_main.ch_names),
                     "channel_types": {
-                        kind: len(mne.pick_types(raw.info, **{kind: True}))
+                        kind: len(mne.pick_types(raw_main.info, **{kind: True}))
                         for kind in ("eeg", "eog", "emg", "ecg")
                     },
-                    "sfreq": float(raw.info["sfreq"]),
-                    "duration_s": float(raw.times[-1]),
+                    "sfreq": float(raw_main.info["sfreq"]),
+                    "duration_s": float(raw_main.times[-1]),
                     "montage": str(cfg["montage"]),
                     "bad_channels": bads,
                     "bad_channels_hash": stable_json_hash(sorted(bads)),
                     "n_events": int(n_events),
+                    "erp_branch": {
+                        "enabled": erp_enabled,
+                        "hp_freq": erp_hp if erp_enabled else None,
+                        "output_file": erp_out_file,
+                        "output_hash": file_sha256(erp_out_file) if erp_out_file else None,
+                    },
                 },
             },
         )

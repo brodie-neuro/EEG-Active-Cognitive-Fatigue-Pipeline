@@ -6,12 +6,14 @@ Collects all preprocessing quality metrics into a single report:
   - Channel interpolation (from average reference step)
   - ASR modification ratio
   - ICLabel component classifications (brain, eye, muscle, etc.)
-  - Epoch counts before/after autoreject (P3b and stimulus epochs)
+  - Epoch counts before/after autoreject (main P3b, ERP-branch P3b, and stimulus epochs)
   - Overall rejection rates
 
 Note: 'stimulus' epochs (-0.5 to 1.8s) are used for all oscillatory
 analyses: PAC, wPLI, theta power, gamma, and peak frequency.
-P3b epochs (-0.2 to 0.8s) are used only for the ERP analysis.
+The dedicated `p3b_erp` branch carries the conservative 0.1 Hz ERP epochs
+used by the P3b analysis, while the main `p3b` epochs remain available as
+the shared onset-clean trial mask used elsewhere in the oscillatory stack.
 
 Outputs:
   - preprocessing_qc_summary.csv  (one row per subject x block)
@@ -71,7 +73,12 @@ def _count_epochs(subj, block, outputs_dir):
         return {}
 
     results = {}
-    for etype in ['p3b', 'pac']:  # pac epochs = stimulus epochs (PAC, wPLI, theta, gamma)
+    epoch_labels = [
+        ('p3b', 'p3b'),
+        ('p3b_erp', 'p3b_erp'),
+        ('pac', 'stim'),
+    ]
+    for etype, out_label in epoch_labels:  # pac epochs = stimulus epochs (PAC, wPLI, theta, gamma)
         # Try per-subject layout first, then legacy flat layout
         for base in [outputs_dir / subj, outputs_dir]:
             raw_file = base / "derivatives" / "epochs" / f"{subj}_block{block}_{etype}-epo.fif"
@@ -97,8 +104,6 @@ def _count_epochs(subj, block, outputs_dir):
             if n_raw > 0 or n_clean > 0:
                 n_rejected = n_raw - n_clean
                 rejection_pct = (n_rejected / n_raw * 100) if n_raw > 0 else 0
-                # Rename 'pac' to 'stim' for clarity in output
-                out_label = 'stim' if etype == 'pac' else etype
                 results[f'{out_label}_epochs_raw'] = n_raw
                 results[f'{out_label}_epochs_clean'] = n_clean
                 results[f'{out_label}_rejected'] = n_rejected

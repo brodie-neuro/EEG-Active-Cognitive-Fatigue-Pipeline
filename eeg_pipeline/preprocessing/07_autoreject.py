@@ -139,6 +139,12 @@ def main():
     input_dir = pipeline_root / "outputs" / "derivatives" / "epochs"
     qc_dir = pipeline_root / "outputs" / "qc_figs" / "autoreject"
     debug_dir = pipeline_root / "outputs" / "features" / "autoreject_debug"
+    erp_branch_cfg = get_param("erp_branch", default={}) or {}
+    epoch_types = ["p3b", "pac"]
+    if bool(erp_branch_cfg.get("enabled", False)):
+        erp_epoch_type = str(erp_branch_cfg.get("epoch_type", "p3b_erp"))
+        if erp_epoch_type not in epoch_types:
+            epoch_types.insert(1, erp_epoch_type)
 
     qc_dir.mkdir(parents=True, exist_ok=True)
     debug_dir.mkdir(parents=True, exist_ok=True)
@@ -146,7 +152,7 @@ def main():
     if not input_dir.exists():
         print(f"Legacy input directory not found: {input_dir}. Trying per-subject layout.")
 
-    for epoch_type in ["p3b", "pac"]:
+    for epoch_type in epoch_types:
         files = iter_derivative_files("epochs", f"*_{epoch_type}-epo.fif", subject=args.subject)
 
         for f in files:
@@ -164,7 +170,7 @@ def main():
                 out_file = subj_output_dir / f"{subj}_{epoch_type}_clean-epo.fif"
                 epochs.save(out_file, overwrite=True)
                 save_step_qc(
-                    "07_autoreject",
+                    f"07_autoreject_{epoch_type}",
                     subj,
                     block_num,
                     {
@@ -283,13 +289,13 @@ def main():
                     epochs_clean,
                     title=f"{subj} {epoch_type} ({n_after}/{n_before} kept)",
                 )
-                qc.add_figure(f"08_autoreject_{epoch_type}", fig)
+                qc.add_figure(f"07_autoreject_{epoch_type}", fig)
             except Exception as exc:
                 print(f"  Could not save epoch QC figure: {exc}")
                 metrics = {}
 
             qc.log_step(
-                f"08_autoreject_{epoch_type}",
+                f"07_autoreject_{epoch_type}",
                 status=status,
                 metrics={
                     "n_before": n_before,
@@ -309,7 +315,7 @@ def main():
             )
             qc.save_report()
             step_qc_path = save_step_qc(
-                "07_autoreject",
+                f"07_autoreject_{epoch_type}",
                 subj,
                 block_num,
                 {

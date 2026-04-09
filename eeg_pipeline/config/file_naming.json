@@ -18,9 +18,13 @@
         "imported": "{subject}_block{block}_raw.fif",
         "referenced": "{subject}_block{block}_ref-raw.fif",
         "notch_filtered": "{subject}_block{block}_notch-raw.fif",
+        "erp_imported": "{subject}_block{block}_raw.fif",
+        "erp_referenced": "{subject}_block{block}_ref-raw.fif",
+        "erp_notch_filtered": "{subject}_block{block}_notch-raw.fif",
         "ica_cleaned": "{subject}_block{block}_ica-raw.fif",
         "asr_cleaned": "{subject}_block{block}_asr-raw.fif",
         "p3b_epochs": "{subject}_block{block}_p3b-epo.fif",
+        "p3b_erp_epochs": "{subject}_block{block}_p3b_erp-epo.fif",
         "pac_epochs": "{subject}_block{block}_pac-epo.fif",
         "epochs_clean": "{subject}_block{block}_{type}_clean-epo.fif"
     },

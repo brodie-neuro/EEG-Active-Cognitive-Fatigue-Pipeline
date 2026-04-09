@@ -18,6 +18,10 @@ This repository contains a scripted EEG preprocessing and analysis pipeline for 
 
 The pipeline is written in Python around MNE-Python and related EEG tooling.
 
+The active preprocessing path is a single shared `1-100 Hz` continuous stream. In practice, that means a shared `1 Hz` high-pass oscillatory path: ASR and ICA both run directly on the same incoming stream rather than creating internal fit-only copies.
+
+A separate `0.1-100 Hz` ERP branch also exists, but only for conservative P3b estimation. That branch does not feed ASR, ICA, PAC, theta power, theta wPLI, gamma, or the main oscillatory outputs.
+
 ## Why This Repo Exists
 
 EEG preprocessing choices can materially alter downstream findings. Different referencing methods, artifact rejection thresholds, and decomposition-based cleaning steps introduce analytical variability that is rarely reported but can change effect sizes, signs, and statistical conclusions.
@@ -53,8 +57,12 @@ For PAC and gamma, `--mode full` is therefore not the final inclusion workflow b
 | **Descriptive** | 12, 15 | Gamma power, frontal-midline theta peak summaries, spectral parameterisation |
 | **Quality control** | 14, 16, 17 | Preprocessing QC summary, EMG covariates, EMG–gamma regression |
 
+P3b in step 08 is estimated from the dedicated `p3b_erp` branch (`0.1 Hz` high-pass). PAC, theta power, theta wPLI, gamma, and the shared oscillatory outputs stay on the main `1 Hz` path.
+
 Method hierarchy:
 
+- The shared `1 Hz` high-pass path is the live oscillatory pipeline for ASR, ICA, PAC, theta power, theta wPLI, gamma, and descriptive specparam outputs.
+- A separate `0.1 Hz` ERP branch exists only for conservative P3b estimation.
 - PAC phase band is fixed at `4-8 Hz`.
 - Frontal midline theta power is fixed-band `4-8 Hz`.
 - Specparam outputs and frontal-midline theta peak summaries are descriptive follow-ups, not required inputs for PAC or fixed-band theta power.
@@ -122,14 +130,14 @@ EEG_study_2/
 
 | Step | Script | Purpose |
 |:-----|:-------|:--------|
-| 01 | `01_import_qc.py` | import, channel typing, shared `1-100 Hz` bandpass filtering, initial QC |
-| 02 | `02_simple_reference.py` | average re-reference (validated as reproducible across hardware) |
-| 03 | `03_notch_filter.py` | FIR notch filter at 50 Hz |
+| 01 | `01_import_qc.py` | import, channel typing, shared `1-100 Hz` oscillatory bandpass plus separate `0.1-100 Hz` ERP-branch filtering, initial QC |
+| 02 | `02_simple_reference.py` | average re-reference for both the shared oscillatory path and the dedicated ERP branch |
+| 03 | `03_notch_filter.py` | FIR notch filter at 50 Hz for both branches |
 | 04 | `04_asr.py` | Artifact Subspace Reconstruction on the shared `1 Hz` high-pass stream (cutoff = 30 SD) |
 | 05 | `05_ica_iclabel.py` | Extended Infomax ICA plus ICLabel-based artifact classification on that same shared `1 Hz` high-pass stream |
-| 06 | `06_epoch.py` | create stimulus-locked epoch sets (P3b and PAC windows) |
-| 07 | `07_autoreject.py` | epoch-level repair and rejection |
-| 08 | `08_erp_p3b.py` | P3b amplitude and latency extraction |
+| 06 | `06_epoch.py` | create main-path `p3b` and `pac` epochs plus separate ERP-branch `p3b_erp` epochs |
+| 07 | `07_autoreject.py` | epoch-level repair and rejection for `p3b`, `p3b_erp`, and `pac` epoch sets |
+| 08 | `08_erp_p3b.py` | P3b amplitude and latency extraction from the dedicated `p3b_erp` branch |
 | 09 | `09_band_power.py` | frontal midline theta power (fixed 4-8 Hz) |
 | 10 | `10_pac_nodal.py` | theta–gamma phase-amplitude coupling |
 | 11 | `11_theta_wpli.py` | theta-band weighted phase lag index |
