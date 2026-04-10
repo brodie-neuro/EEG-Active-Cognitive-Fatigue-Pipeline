@@ -53,7 +53,7 @@ For PAC and gamma, `--mode full` is therefore not the final inclusion workflow b
 
 | Type | Steps | Measures |
 |:-----|:------|:---------|
-| **Confirmatory** | 08–11 | P3b amplitude/latency, fixed-band frontal midline theta power, fixed 4–8 Hz theta–gamma PAC, theta wPLI |
+| **Confirmatory** | 08–11 | P3b mean amplitude and fractional area latency (Luck, 2014), fixed-band frontal midline theta power, fixed 4–8 Hz theta–gamma PAC, theta wPLI |
 | **Descriptive** | 12, 15 | Gamma power, frontal-midline theta peak summaries, spectral parameterisation |
 | **Quality control** | 14, 16, 17 | Preprocessing QC summary, EMG covariates, EMG–gamma regression |
 
@@ -137,7 +137,7 @@ EEG_study_2/
 | 05 | `05_ica_iclabel.py` | Extended Infomax ICA plus ICLabel-based artifact classification on that same shared `1 Hz` high-pass stream |
 | 06 | `06_epoch.py` | create main-path `p3b` and `pac` epochs plus separate ERP-branch `p3b_erp` epochs |
 | 07 | `07_autoreject.py` | epoch-level repair and rejection for `p3b`, `p3b_erp`, and `pac` epoch sets |
-| 08 | `08_erp_p3b.py` | P3b amplitude and latency extraction from the dedicated `p3b_erp` branch |
+| 08 | `08_erp_p3b.py` | P3b mean amplitude and fractional area latency (50%) from the dedicated `p3b_erp` branch |
 | 09 | `09_band_power.py` | frontal midline theta power (fixed 4-8 Hz) |
 | 10 | `10_pac_nodal.py` | theta–gamma phase-amplitude coupling |
 | 11 | `11_theta_wpli.py` | theta-band weighted phase lag index |

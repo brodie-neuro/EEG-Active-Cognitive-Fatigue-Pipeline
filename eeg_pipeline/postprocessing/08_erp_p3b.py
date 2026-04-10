@@ -155,9 +155,40 @@ P3B_TMAX = _p3b_cfg.get('tmax_peak', 0.500)
 P3B_CHANNELS = _p3b_cfg.get('channels', ['Pz'])
 
 
+def _fractional_area_latency(erp_win, times_win, fraction=0.5):
+    """
+    Fractional area latency (Luck, 2014).
+
+    Find the timepoint at which `fraction` (default 50%) of the total
+    positive area under the ERP in the window has been reached.
+    More robust than argmax, which can be dragged by slow positive drift.
+
+    Parameters
+    ----------
+    erp_win : ndarray
+        ERP values within the P3b window.
+    times_win : ndarray
+        Time values (seconds) for the window.
+    fraction : float
+        Area fraction (default 0.5 = 50%).
+
+    Returns
+    -------
+    float : latency in seconds at which the fraction of area is reached.
+    """
+    pos_erp = np.clip(erp_win, 0, None)
+    total = pos_erp.sum()
+    if total == 0:
+        return times_win[len(times_win) // 2]
+    cumulative = np.cumsum(pos_erp)
+    idx = int(np.searchsorted(cumulative, fraction * total))
+    idx = min(idx, len(times_win) - 1)
+    return times_win[idx]
+
+
 def extract_p3b(epochs, ch_picks=None):
     """
-    Extract P3b mean amplitude and peak latency from target epochs.
+    Extract P3b mean amplitude and fractional area latency from target epochs.
 
     Parameters
     ----------
@@ -167,14 +198,18 @@ def extract_p3b(epochs, ch_picks=None):
 
     Returns
     -------
-    dict with P3b mean-window amplitude and peak positivity amplitude.
+    dict with P3b mean-window amplitude (gold standard) and
+    fractional area latency (50%, Luck 2014).
     """
     if ch_picks is None:
         ch_picks = P3B_CHANNELS
 
     avail = available_channels(ch_picks, epochs.ch_names)
     if not avail:
-        avail = [epochs.ch_names[0]]
+        raise ValueError(
+            f"No P3b cluster channels {ch_picks} found in data channels {epochs.ch_names}. "
+            f"Check p3b.channels in parameters.json."
+        )
 
     # Get data: (n_epochs, n_channels, n_times)
     data = epochs.copy().pick(avail).get_data()
@@ -183,24 +218,21 @@ def extract_p3b(epochs, ch_picks=None):
     # Grand average ERP (mean across epochs, then across channels)
     erp = data.mean(axis=0).mean(axis=0)  # (n_times,)
 
-    def _window_features(tmin, tmax):
-        t_mask = (times >= tmin) & (times <= tmax)
-        if not np.any(t_mask):
-            return np.nan, np.nan, np.nan
+    t_mask = (times >= P3B_TMIN) & (times <= P3B_TMAX)
+    if not np.any(t_mask):
+        p3b_mean = np.nan
+        p3b_lat = np.nan
+    else:
         win_erp = erp[t_mask]
-        mean_uv = float(win_erp.mean() * 1e6)
-        peak_uv = float(np.max(win_erp) * 1e6)
-        peak_idx = int(np.argmax(win_erp))
-        lat_ms = float(times[t_mask][peak_idx] * 1000.0)
-        return mean_uv, peak_uv, lat_ms
-
-    p3b_mean, p3b_peak, p3b_lat = _window_features(P3B_TMIN, P3B_TMAX)
+        win_times = times[t_mask]
+        p3b_mean = float(win_erp.mean() * 1e6)
+        fal_time = _fractional_area_latency(win_erp, win_times, fraction=0.5)
+        p3b_lat = float(fal_time * 1000.0)
 
     return {
         'p3b_amplitude_uV': p3b_mean,  # legacy key (mean window amplitude)
         'p3b_mean_uV': p3b_mean,
-        'p3b_peak_uV': p3b_peak,
-        'p3b_latency_ms': p3b_lat,
+        'p3b_latency_ms': p3b_lat,     # fractional area latency (50%)
         '_erp_uV': erp * 1e6,   # full ERP waveform in µV (for diagnostics)
         '_times_ms': times * 1000,  # time vector in ms
         '_trial_data': data.mean(axis=1),  # (n_trials, n_times) channel-averaged
@@ -259,12 +291,11 @@ def main():
                 'block': block,
                 'p3b_amp_uV': p3b['p3b_amplitude_uV'],
                 'p3b_mean_uV': p3b['p3b_mean_uV'],
-                'p3b_peak_uV': p3b['p3b_peak_uV'],
                 'p3b_lat_ms': p3b['p3b_latency_ms'],
             })
             print(
                 f"  Block {block}: "
-                f"P3 mean={p3b['p3b_mean_uV']:.2f} uV, peak={p3b['p3b_peak_uV']:.2f} uV @ {p3b['p3b_latency_ms']:.0f} ms"
+                f"P3b mean={p3b['p3b_mean_uV']:.2f} uV, FAL={p3b['p3b_latency_ms']:.0f} ms"
             )
 
             # Accumulate for diagnostic plot
