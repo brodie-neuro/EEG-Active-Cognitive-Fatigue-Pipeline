@@ -57,7 +57,7 @@ For PAC and gamma, `--mode full` is therefore not the final inclusion workflow b
 | **Descriptive** | 12, 15 | Gamma power, frontal-midline theta peak summaries, spectral parameterisation |
 | **Quality control** | 14, 16, 17 | Preprocessing QC summary, EMG covariates, EMG–gamma regression |
 
-P3b in step 08 is estimated from the dedicated `p3b_erp` branch (`0.1 Hz` high-pass). PAC, theta power, theta wPLI, gamma, and the shared oscillatory outputs stay on the main `1 Hz` path.
+P3b in step 08 is estimated from the dedicated `p3b_erp` branch (`0.1 Hz` high-pass). P3b latency uses 50% fractional area latency rather than argmax peak detection. The `0.1 Hz` high-pass preserves ERP amplitude fidelity but also admits slow positive drift, which can pull argmax toward the window edge rather than the true P3b peak. Fractional area latency (the timepoint at which 50% of the cumulative positive area in the P3b window has been reached) is robust to this drift and is recommended over argmax for ERP latency estimation (Luck, 2014). PAC, theta power, theta wPLI, gamma, and the shared oscillatory outputs stay on the main `1 Hz` path.
 
 Method hierarchy:
 
