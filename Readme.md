@@ -56,6 +56,7 @@ For PAC and gamma, `--mode full` is therefore not the final inclusion workflow b
 | **Confirmatory** | 08–11 | P3b mean amplitude and fractional area latency (Luck, 2014), fixed-band frontal midline theta power, fixed 4–8 Hz theta–gamma PAC, theta wPLI |
 | **Descriptive** | 12, 15 | Gamma power, frontal-midline theta peak summaries, spectral parameterisation |
 | **Quality control** | 14, 16, 17 | Preprocessing QC summary, EMG covariates, EMG–gamma regression |
+| **EMG sensitivity** | 10b, 17b | EMG-corrected PAC, group-level EMG–PAC delta correlation |
 
 P3b in step 08 is estimated from the dedicated `p3b_erp` branch (`0.1 Hz` high-pass). P3b latency uses 50% fractional area latency rather than argmax peak detection. The `0.1 Hz` high-pass preserves ERP amplitude fidelity but also admits slow positive drift, which can pull argmax toward the window edge rather than the true P3b peak. Fractional area latency (the timepoint at which 50% of the cumulative positive area in the P3b window has been reached) is robust to this drift and is recommended over argmax for ERP latency estimation (Luck, 2014). PAC, theta power, theta wPLI, gamma, and the shared oscillatory outputs stay on the main `1 Hz` path.
 
@@ -105,6 +106,7 @@ EEG_study_2/
       08_erp_p3b.py
       09_band_power.py
       10_pac_nodal.py
+      10b_pac_emg_corrected.py
       11_theta_wpli.py
       12_gamma_power.py
       13_merge_features.py
@@ -112,6 +114,7 @@ EEG_study_2/
       15_theta_stim_specparam.py
       16_emg_pca_covariates.py
       17_emg_gamma_regression.py
+      17b_emg_pac_correlation.py
     src/
   PARAMETERS.md
   requirements.txt
@@ -150,8 +153,22 @@ EEG_study_2/
 - `15_theta_stim_specparam.py`
 - `16_emg_pca_covariates.py`
 - `17_emg_gamma_regression.py`
+- `10b_pac_emg_corrected.py`
+- `17b_emg_pac_correlation.py`
 
 `15_theta_stim_specparam.py` is a descriptive frontal-midline theta peak / spectral-parameterisation follow-up and is not required for PAC computation or fixed-band theta-power extraction. By contrast, steps 16 and 17 remain part of the EMG-gating workflow for final PAC and gamma inclusion decisions even though they are not launched by `--mode full`.
+
+### EMG sensitivity analysis (steps 10b, 17b)
+
+Because gamma-band activity overlaps spectrally with scalp muscle (EMG) contamination, the pipeline includes a three-stage EMG sensitivity workflow to verify that PAC findings are not driven by myogenic artifact:
+
+1. **Step 17 — EMG audit.** OLS trial-level regression of parietal gamma power (C_broad_P: Pz, POz, P3, P4, P1, P2, PO3, PO4) against EMG PC1 (from step 16). Reports per-participant, per-block R² quantifying how much of the gamma amplitude at the PAC target site is explained by peripheral muscle activity.
+
+2. **Step 17b — Group-level delta correlation.** Correlates participant-level change in EMG variance (B5 − B1) with change in PAC z-score (B5 − B1). If the correlation is weak, the PAC fatigue effect is not driven by participants changing their muscle tension between blocks.
+
+3. **Step 10b — EMG-corrected PAC.** Regresses EMG PC1 out of the parietal signal at every time point across trials, then recomputes PAC from the corrected signal using the same method as step 10 (trial-concatenated MI, 500 circular-shift surrogates, seed = 42). If the corrected PAC values are highly correlated with uncorrected values, the theta–gamma coupling effect survives EMG removal.
+
+The primary PAC result (step 10) is reported as the main finding. Steps 17, 17b, and 10b are reported as a sensitivity analysis confirming that the PAC effect is not attributable to myogenic contamination.
 
 ## Parameters and Method Rationale
 
@@ -233,6 +250,8 @@ Examples:
 python eeg_pipeline/postprocessing/15_theta_stim_specparam.py
 python eeg_pipeline/postprocessing/16_emg_pca_covariates.py
 python eeg_pipeline/postprocessing/17_emg_gamma_regression.py
+python eeg_pipeline/postprocessing/17b_emg_pac_correlation.py
+python eeg_pipeline/postprocessing/10b_pac_emg_corrected.py
 ```
 
 ## Outputs
