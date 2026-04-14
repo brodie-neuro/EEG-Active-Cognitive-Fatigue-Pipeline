@@ -143,9 +143,13 @@ EEG_study_2/
 | 08 | `08_erp_p3b.py` | P3b mean amplitude and fractional area latency (50%) from the dedicated `p3b_erp` branch |
 | 09 | `09_band_power.py` | frontal midline theta power (fixed 4-8 Hz) |
 | 10 | `10_pac_nodal.py` | theta–gamma phase-amplitude coupling |
+| 10b | `10b_pac_emg_corrected.py` | PAC recomputed after regressing EMG PC1 out of parietal gamma signal at each time point (sensitivity check) |
 | 11 | `11_theta_wpli.py` | theta-band weighted phase lag index |
 | 12 | `12_gamma_power.py` | gamma power features |
 | 13 | `13_merge_features.py` | merge core feature tables |
+| 16 | `16_emg_pca_covariates.py` | PCA-based EMG covariates from temporalis bipolar (F7−FT7, F8−FT8) and posterior neck monopolar (TP7, TP8) channels |
+| 17 | `17_emg_gamma_regression.py` | OLS regression of parietal gamma (C_broad_P) against EMG PC1 per trial per block |
+| 17b | `17b_emg_pac_correlation.py` | group-level delta-EMG vs delta-PAC correlation to test whether PAC fatigue effect is driven by EMG changes |
 
 ### Ancillary scripts not run by `--mode full`
 
@@ -169,6 +173,8 @@ Because gamma-band activity overlaps spectrally with scalp muscle (EMG) contamin
 3. **Step 10b — EMG-corrected PAC.** Regresses EMG PC1 out of the parietal signal at every time point across trials, then recomputes PAC from the corrected signal using the same method as step 10 (trial-concatenated MI, 500 circular-shift surrogates, seed = 42). If the corrected PAC values are highly correlated with uncorrected values, the theta–gamma coupling effect survives EMG removal.
 
 The primary PAC result (step 10) is reported as the main finding. Steps 17, 17b, and 10b are reported as a sensitivity analysis confirming that the PAC effect is not attributable to myogenic contamination.
+
+The time-point regression in step 10b is intentionally conservative: it removes any trial-wise parietal variance linearly associated with EMG, not only proven muscle artifact. This makes it a robust upper-bound test — if PAC survives this aggressive correction, the theta–gamma coupling effect cannot be attributed to peripheral EMG.
 
 ## Parameters and Method Rationale
 

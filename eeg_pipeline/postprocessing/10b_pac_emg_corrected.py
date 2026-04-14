@@ -136,7 +136,7 @@ def _modulation_index(theta_phase, gamma_amp, n_bins=12):
     return kl_div / np.log(n_bins)
 
 
-def _pac_from_precomputed(theta_phase, gamma_amp, n_surr=500):
+def _pac_from_precomputed(theta_phase, gamma_amp, n_surr):
     """Trial-concatenated MI with surrogates."""
     n_epochs = min(theta_phase.shape[0], gamma_amp.shape[0])
     if n_epochs == 0:
@@ -189,9 +189,11 @@ def main():
         raise FileNotFoundError(f"{emg_path} not found. Run step 16 first.")
     emg_df = pd.read_csv(emg_path)
 
-    pac_cfg = cfg.get('pac', {})
+    pac_cfg = get_param('pac', default={})
     f_pha = pac_cfg.get('phase_band', [4, 8])
     f_amp = pac_cfg.get('amp_band', [55, 85])
+    n_surr = pac_cfg.get('n_surrogates', 500)
+    print(f"  PAC params (from config): phase={f_pha}, amp={f_amp}, surrogates={n_surr}")
 
     between_rows = []
 
@@ -264,7 +266,7 @@ def main():
                     continue
 
                 # --- Compute PAC ---
-                z = _pac_from_precomputed(theta_ph, gamma_am)
+                z = _pac_from_precomputed(theta_ph, gamma_am, n_surr=n_surr)
                 col = f"pac_between_{phase_node}_{amp_node}"
                 print(f"  EMG-corrected PAC ({phase_node}->{amp_node}): Z = {z:.3f}")
 
