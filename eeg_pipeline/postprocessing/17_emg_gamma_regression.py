@@ -315,7 +315,10 @@ def main():
     blocks = cfg.get("blocks", [1, 5])
 
     emg_df = _load_emg_covariates()
-    gamma_node_df = _load_gamma_node_features()
+    try:
+        gamma_node_df = _load_gamma_node_features()
+    except FileNotFoundError:
+        gamma_node_df = pd.DataFrame()  # empty — fallback to stim
     gamma_stim_df = _load_gamma_stim_features()
 
     subjects = sorted(emg_df["subject"].unique())
@@ -342,11 +345,14 @@ def main():
                 raise RuntimeError(f"Block {block}: no EMG data for {subj}.")
 
             # Get gamma node features for this block (pre-motor window)
-            gamma_block = gamma_node_df[
-                (gamma_node_df["subject"] == subj) &
-                (gamma_node_df["block"] == block) &
-                (gamma_node_df["window"].str.contains("0.0-0.6"))
-            ].reset_index(drop=True)
+            if not gamma_node_df.empty and "subject" in gamma_node_df.columns:
+                gamma_block = gamma_node_df[
+                    (gamma_node_df["subject"] == subj) &
+                    (gamma_node_df["block"] == block) &
+                    (gamma_node_df["window"].str.contains("0.0-0.6"))
+                ].reset_index(drop=True)
+            else:
+                gamma_block = pd.DataFrame()
 
             if gamma_block.empty:
                 # Try getting from stim features instead
@@ -464,7 +470,7 @@ def main():
                     ],
                     "input_hash": {
                         "emg_covariates": file_sha256(OUTPUT_DIR / "emg_covariates.csv"),
-                        "gamma_node_features": file_sha256(OUTPUT_DIR / "gamma_node_features.csv"),
+                        "gamma_node_features": file_sha256(OUTPUT_DIR / "gamma_node_features.csv") if (OUTPUT_DIR / "gamma_node_features.csv").exists() else "N/A",
                         "gamma_stim_features": file_sha256(OUTPUT_DIR / "gamma_stim_features.csv"),
                     },
                     "output_file": str(out_s),
@@ -545,11 +551,16 @@ def _compute_trial_gamma(subj, block, cfg):
             if drop_idx:
                 epochs.drop(drop_idx, reason="not in autoreject clean set")
 
-    # Get node channels
-    node_chs = get_node_channels("CF", cfg)
+    # Get node channels — must match the PAC gamma amplitude node (C_broad_P)
+    # PAC = C_broad_F theta phase → C_broad_P gamma amplitude
+    # EMG sensitivity must target the parietal gamma site, not frontal theta
+    h1_nodes = cfg.get('h1_nodes', {})
+    node_chs = h1_nodes.get('C_broad_P', [])
+    if not node_chs:
+        raise ValueError("No C_broad_P node channels found in h1_nodes config.")
     avail = available_channels(node_chs, epochs.ch_names)
     if not avail:
-        raise ValueError(f"No CF node channels available in epochs for {subj} block {block}. Check node config.")
+        raise ValueError(f"No C_broad_P channels available in epochs for {subj} block {block}.")
 
     data = epochs.copy().pick(avail).get_data()  # (n_ep, n_ch, n_times)
     roi_data = data.mean(axis=1)  # (n_ep, n_times)

@@ -80,8 +80,8 @@ def _plot_erp_diagnostic(subj, block_erps, times_ms):
     ax_erp.axvspan(P3B_TMIN * 1000, P3B_TMAX * 1000, alpha=0.2, color=_CLR_P3B, label='P3b window')
     # Diamond at P3b peak
     if not np.isnan(feat0['p3b_latency_ms']):
-        ax_erp.plot(feat0['p3b_latency_ms'], feat0['p3b_peak_uV'], 'D',
-                    color=_CLR_P3B, ms=10, zorder=5, label=f'Peak @ {feat0["p3b_latency_ms"]:.0f} ms')
+        ax_erp.plot(feat0['p3b_latency_ms'], feat0['p3b_mean_uV'], 'D',
+                    color=_CLR_P3B, ms=10, zorder=5, label=f'FAL @ {feat0["p3b_latency_ms"]:.0f} ms')
     ax_erp.axhline(0, color='gray', lw=0.5, ls='--')
     ax_erp.axvline(0, color='gray', lw=0.5, ls='--')
     ax_erp.set_xlabel('Time (ms)')
@@ -116,10 +116,10 @@ def _plot_erp_diagnostic(subj, block_erps, times_ms):
         # Stats box
         feat_b1 = block_erps[b1]['features']
         feat_b5 = block_erps[b5]['features']
-        delta_amp = feat_b1['p3b_peak_uV'] - feat_b5['p3b_peak_uV']
+        delta_amp = feat_b1['p3b_mean_uV'] - feat_b5['p3b_mean_uV']
         delta_lat = feat_b1['p3b_latency_ms'] - feat_b5['p3b_latency_ms']
-        stats_txt = (f"B{b1} peak: {feat_b1['p3b_peak_uV']:.1f} µV @ {feat_b1['p3b_latency_ms']:.0f} ms\n"
-                     f"B{b5} peak: {feat_b5['p3b_peak_uV']:.1f} µV @ {feat_b5['p3b_latency_ms']:.0f} ms\n"
+        stats_txt = (f"B{b1} mean: {feat_b1['p3b_mean_uV']:.1f} µV @ {feat_b1['p3b_latency_ms']:.0f} ms\n"
+                     f"B{b5} mean: {feat_b5['p3b_mean_uV']:.1f} µV @ {feat_b5['p3b_latency_ms']:.0f} ms\n"
                      f"Δamp: {delta_amp:+.1f} µV  Δlat: {delta_lat:+.0f} ms")
         ax_cmp.text(0.02, 0.98, stats_txt, transform=ax_cmp.transAxes,
                     fontsize=7, va='top', bbox=_STAT_BOX)
