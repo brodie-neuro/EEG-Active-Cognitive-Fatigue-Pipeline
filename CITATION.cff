@@ -6,7 +6,7 @@ abstract: >-
   A scripted EEG preprocessing and analysis pipeline for studying
   active cognitive fatigue using 64-channel EEG. The pipeline
   quantifies frontoparietal theta-gamma phase-amplitude coupling,
-  exploratory alpha-gamma phase-amplitude coupling, and P3b
+  alpha-gamma phase-amplitude coupling, and P3b
   event-related potentials, with explicit EMG contamination control
   for PAC analyses involving gamma amplitude.
   Designed for deterministic, reproducible execution across compute

@@ -28,6 +28,24 @@ jobs:
       - name: Verify runner imports
         run: python eeg_pipeline/run_pipeline.py --help
 
+      - name: Verify step CLIs
+        run: |
+          python eeg_pipeline/preprocessing/01_import_qc.py --help
+          python eeg_pipeline/preprocessing/02_simple_reference.py --help
+          python eeg_pipeline/preprocessing/03_notch_filter.py --help
+          python eeg_pipeline/preprocessing/04_asr.py --help
+          python eeg_pipeline/preprocessing/05_ica_iclabel.py --help
+          python eeg_pipeline/preprocessing/06_epoch.py --help
+          python eeg_pipeline/preprocessing/07_autoreject.py --help
+          python eeg_pipeline/postprocessing/08_pac_nodal.py --help
+          python eeg_pipeline/postprocessing/08b_pac_emg_corrected.py --help
+          python eeg_pipeline/postprocessing/09_alpha_gamma_pac.py --help
+          python eeg_pipeline/postprocessing/10_erp_p3b.py --help
+          python eeg_pipeline/postprocessing/11_merge_features.py --help
+          python eeg_pipeline/postprocessing/12_preprocessing_qc_summary.py --help
+          python eeg_pipeline/postprocessing/13_emg_pca_covariates.py --help
+          python eeg_pipeline/postprocessing/14_emg_pac_correlation.py --help
+
       - name: Verify step-module imports
         run: |
           python -c "
@@ -40,13 +58,14 @@ jobs:
             'eeg_pipeline.preprocessing.05_ica_iclabel',
             'eeg_pipeline.preprocessing.06_epoch',
             'eeg_pipeline.preprocessing.07_autoreject',
-            'eeg_pipeline.postprocessing.08_erp_p3b',
-            'eeg_pipeline.postprocessing.10_pac_nodal',
-            'eeg_pipeline.postprocessing.13_merge_features',
-            'eeg_pipeline.postprocessing.14_preprocessing_qc_summary',
-            'eeg_pipeline.postprocessing.16_emg_pca_covariates',
-            'eeg_pipeline.postprocessing.17_emg_pac_correlation',
-            'eeg_pipeline.postprocessing.18_alpha_gamma_pac',
+            'eeg_pipeline.postprocessing.08_pac_nodal',
+            'eeg_pipeline.postprocessing.08b_pac_emg_corrected',
+            'eeg_pipeline.postprocessing.09_alpha_gamma_pac',
+            'eeg_pipeline.postprocessing.10_erp_p3b',
+            'eeg_pipeline.postprocessing.11_merge_features',
+            'eeg_pipeline.postprocessing.12_preprocessing_qc_summary',
+            'eeg_pipeline.postprocessing.13_emg_pca_covariates',
+            'eeg_pipeline.postprocessing.14_emg_pac_correlation',
           ]
           failed = []
           for mod in steps:

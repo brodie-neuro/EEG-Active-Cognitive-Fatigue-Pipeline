@@ -1,4 +1,4 @@
-# postprocessing/08_erp_p3b.py
+# postprocessing/10_erp_p3b.py
 """
 P3b ERP Analysis
 
@@ -242,7 +242,15 @@ def extract_p3b(epochs, ch_picks=None):
 def main():
     parser = argparse.ArgumentParser(description='P3b ERP analysis')
     parser.add_argument('--no-plots', action='store_true', help='Skip diagnostic figures')
+    parser.add_argument(
+        '--subject',
+        type=str,
+        default='',
+        help='Optional subject filter, e.g. sub-p001 or sub-p001,sub-p002',
+    )
     args, _ = parser.parse_known_args()
+    if args.subject.strip():
+        os.environ["EEG_SUBJECT_FILTER"] = args.subject.strip()
     do_plots = not args.no_plots
 
     cfg = load_config()

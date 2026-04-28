@@ -15,7 +15,7 @@ behavioral_data: null                     # Path to d' CSV - set when available
 # Revised node structure (PAC pilot rerun, 2026-03-04)
 # C_broad: bilateral frontal->parietal (8+8 channels) - primary
 # Fz->Pz: single-channel descriptive pair - subset of C_broad
-# F_CR/P_CR removed (PAC went wrong direction with fatigue)
+# Earlier narrow right-lateralized nodes were removed; broad bilateral nodes are primary.
 # LF/LP removed (no multiple comparisons needed)
 h1_nodes:
   C_broad_F: ['Fz', 'FCz', 'F3', 'F4', 'FC1', 'FC2', 'FC3', 'FC4']   # bilateral frontal (8 ch)

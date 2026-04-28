@@ -1,4 +1,4 @@
-# postprocessing/14_preprocessing_qc_summary.py
+# postprocessing/12_preprocessing_qc_summary.py
 """
 Preprocessing QC Summary
 
@@ -26,6 +26,7 @@ individual step reports.
 import sys
 import json
 import os
+import argparse
 from pathlib import Path
 import numpy as np
 import pandas as pd
@@ -42,7 +43,7 @@ except ImportError:
 pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
 
-from src.utils_io import load_config
+from src.utils_io import load_config, parse_subject_filter, subject_matches
 
 OUTPUT_DIR = pipeline_dir / "outputs" / "features"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -114,6 +115,15 @@ def _count_epochs(subj, block, outputs_dir):
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Summarise preprocessing QC metrics.")
+    parser.add_argument(
+        "--subject",
+        default=os.environ.get("EEG_SUBJECT_FILTER", ""),
+        help="Optional subject filter, e.g. sub-p001 or sub-p001,sub-p002.",
+    )
+    args = parser.parse_args()
+    selected_subjects = parse_subject_filter(args.subject)
+
     cfg = load_config()
     blocks = cfg.get('blocks', [1, 5])
     outputs_dir = pipeline_dir / "outputs"
@@ -134,6 +144,8 @@ def main():
                     subjects.add(subj)
 
     subjects = sorted(subjects)
+    if selected_subjects:
+        subjects = [s for s in subjects if subject_matches(s, selected_subjects)]
     if not subjects:
         print("No subjects found.")
         return

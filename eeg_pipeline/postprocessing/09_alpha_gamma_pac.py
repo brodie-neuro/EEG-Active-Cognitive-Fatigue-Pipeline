@@ -1,22 +1,18 @@
-# eeg_pipeline/postprocessing/18_alpha_gamma_pac.py
+# eeg_pipeline/postprocessing/09_alpha_gamma_pac.py
 """
-Step 18 — Between-region alpha-gamma phase-amplitude coupling (exploratory/descriptive).
+Step 09 - Between-region alpha-gamma phase-amplitude coupling (H2).
 
 Computes frontal alpha (8-13 Hz) phase × parietal gamma (55-85 Hz) amplitude
 PAC using the same trial-concatenated MI + circular-shift surrogates method
-as step 10 (theta-gamma PAC).
+as step 08 (theta-gamma PAC).
 
   Phase: C_broad_F (Fz, FCz, F3, F4, FC1, FC2, FC3, FC4)
   Amplitude: C_broad_P (Pz, POz, P3, P4, P1, P2, PO3, PO4)
 
-This mirrors the frontoparietal topology of the confirmatory theta-gamma
-analysis (H1) but indexes a distinct cross-frequency interaction:
+This mirrors the frontoparietal topology of theta-gamma PAC (H1) but indexes
+a distinct confirmatory cross-frequency interaction:
 alpha-mediated executive gating rather than theta-mediated temporal
 organisation of WM content.
-
-This is a strictly descriptive state-characterisation measure, not a
-confirmatory hypothesis test. It provides an a priori predictor for
-a powered follow-up study.
 
 Motivation:
   - Mangan & Kourtis (2026, JoCN) proposed that cognitive fatigue
@@ -24,7 +20,7 @@ Motivation:
   - Miller et al. (2018, Neuron) — alpha/beta as top-down gating of
     gamma content in WM 2.0 framework.
 
-Method: identical to step 10
+Method: identical to step 08
   - Trial-concatenated MI (Tort et al., 2010)
   - 500 circular-shift surrogates, seed=42
   - z-scored MI
@@ -34,7 +30,7 @@ Outputs:
   - alpha_gamma_pac_features.csv
   - Per-subject diagnostic figures (optional)
 
-Does NOT modify step 10 outputs or any confirmatory analyses.
+Does NOT modify step 08 outputs.
 """
 import os
 import sys
@@ -76,7 +72,7 @@ GAMMA_BAND = (55.0, 85.0)
 N_SURROGATES = 500
 RANDOM_SEED = 42
 PAC_WINDOW = (0.0, 0.6)
-N_BINS = 12  # match step 10 (30 deg bins)
+N_BINS = 12  # match step 08 (30 deg bins)
 
 
 
@@ -123,7 +119,7 @@ def _gamma_amp(signal_1d, sfreq):
     return np.abs(sp_hilbert(filt))
 
 
-# ── MI computation (identical to step 10) ──
+# -- MI computation (identical to step 08) --
 
 def _modulation_index(phase, amplitude, n_bins=N_BINS):
     """Tort et al. (2010) modulation index."""
@@ -173,7 +169,7 @@ def _precompute_phase_amp(node_signal, sfreq, times=None, crop_window=None):
 def compute_alpha_gamma_pac(phase_signal, amp_signal, sfreq, times, crop_window=None):
     """Trial-concatenated alpha-gamma MI + surrogates.
 
-    Matches step 10 method: filter full buffered epochs, THEN crop to
+    Matches step 08 method: filter full buffered epochs, THEN crop to
     analysis window. This preserves filter edge stability.
     Returns z-scored MI.
     """
@@ -232,6 +228,40 @@ def compute_alpha_gamma_pac(phase_signal, amp_signal, sfreq, times, crop_window=
 
 # ── Diagnostic figure ──
 
+def _plot_phase_amp_profile(ax, bin_centers, mean_amp, color, phase_label):
+    """Plot phase-binned amplitude with a scaled sine reference underneath."""
+    x_deg = np.degrees(bin_centers)
+    width = 360 / len(mean_amp) * 0.82
+
+    ax.bar(x_deg, mean_amp, width=width, color=color, alpha=0.68,
+           edgecolor=color, linewidth=0.7, label='Mean amplitude')
+
+    ymax = float(np.nanmax(mean_amp)) if np.isfinite(mean_amp).any() else 1.0
+    if ymax <= 0:
+        ymax = 1.0
+
+    peak_idx = int(np.nanargmax(mean_amp))
+    peak_phase = x_deg[peak_idx]
+    ax.axvline(peak_phase, color='#263238', lw=1.2, ls='--', alpha=0.75,
+               label=f'Preferred phase ({peak_phase:.0f} deg)')
+
+    # Visual reference only: scaled under the bars, not an amplitude trace.
+    wave_x = np.linspace(-180, 180, 361)
+    wave_y = -0.12 * ymax + 0.065 * ymax * np.sin(np.deg2rad(wave_x))
+    ax.plot(wave_x, wave_y, color='#263238', lw=1.3, alpha=0.85,
+            label='Phase reference (scaled)')
+    ax.axhline(0, color='#B0BEC5', lw=0.7, zorder=0)
+    ax.text(177, -0.205 * ymax, 'phase reference', fontsize=7,
+            color='#455A64', ha='right', va='bottom', style='italic')
+
+    ax.set_xlim(-190, 190)
+    ax.set_ylim(-0.24 * ymax, 1.18 * ymax)
+    ax.set_xticks([-180, -90, 0, 90, 180])
+    ax.set_xlabel(f'{phase_label} (deg)', fontsize=10)
+    ax.set_ylabel('Gamma amplitude (nV)', fontsize=10)
+    ax.legend(fontsize=7, loc='upper left', frameon=False)
+
+
 def _plot_diagnostic(subj, variant_label, block_details):
     """Simple phase-amplitude histogram for each block."""
     n_blocks = len(block_details)
@@ -257,16 +287,13 @@ def _plot_diagnostic(subj, variant_label, block_details):
                 mean_amp[b] = amp[mask].mean() * 1e9  # nV
 
         c = colors.get(block, '#455A64')
-        ax.bar(np.degrees(bin_centers), mean_amp,
-               width=360 / N_BINS * 0.8, color=c, alpha=0.65,
-               edgecolor=c, linewidth=0.5)
-        ax.set_xlabel('α phase (°)', fontsize=10)
+        _plot_phase_amp_profile(ax, bin_centers, mean_amp, c, 'Alpha phase')
         ax.set_title(f'Block {block} (z={det["z"]:.2f})',
                      fontweight='bold', fontsize=11)
-        ax.set_xlim(-200, 200)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
 
 
-    axes[0].set_ylabel('γ amplitude (nV)', fontsize=10)
     fig.suptitle(f'{subj} — {variant_label}\n'
                  f'α ({ALPHA_BAND[0]}-{ALPHA_BAND[1]} Hz) × '
                  f'γ ({GAMMA_BAND[0]}-{GAMMA_BAND[1]} Hz)',
@@ -289,7 +316,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 def _setup_logging():
     """Configure logging to both console and file."""
-    log_file = LOG_DIR / "18_alpha_gamma_pac.log"
+    log_file = LOG_DIR / "09_alpha_gamma_pac.log"
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s [%(levelname)s] %(message)s',
@@ -314,17 +341,19 @@ def _save_incremental(rows, out_csv, logger):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Alpha-gamma PAC (exploratory/descriptive)')
+        description='Alpha-gamma PAC (H2)')
     parser.add_argument('--no-plots', action='store_true',
                         help='Skip diagnostic figures')
     parser.add_argument('--subject', type=str, default=None,
-                        help='Process a single subject')
+                        help='Optional subject filter, e.g. sub-p001 or sub-p001,sub-p002')
     args, _ = parser.parse_known_args()
+    if args.subject:
+        os.environ["EEG_SUBJECT_FILTER"] = args.subject.strip()
     do_plots = not args.no_plots
 
     logger = _setup_logging()
     logger.info("=" * 60)
-    logger.info("Step 18: Alpha-Gamma PAC (Exploratory/Descriptive)")
+    logger.info("Step 09: Alpha-Gamma PAC (H2)")
     logger.info("=" * 60)
 
     cfg = load_config()
@@ -340,12 +369,6 @@ def main():
         logger.warning("No PAC epoch files found.")
         return
 
-    if args.subject:
-        if args.subject not in subjects:
-            logger.warning(f"{args.subject} not found in {subjects}")
-            return
-        subjects = [args.subject]
-
     logger.info(f"Subjects: {subjects}")
     logger.info(f"Blocks: {blocks}")
 
@@ -358,7 +381,7 @@ def main():
     variants = [
         {
             'label': 'frontal_alpha_to_parietal_gamma',
-            'role': 'EXPLORATORY',
+            'role': 'CONFIRMATORY',
             'phase_chs': frontal_chs,
             'phase_desc': 'C_broad_F',
             'amp_chs': parietal_chs,
@@ -470,7 +493,7 @@ def main():
         for (subj, variant_label), block_details in plot_data.items():
             _plot_diagnostic(subj, variant_label, block_details)
 
-    logger.info("\nStep 18 complete.")
+    logger.info("\nStep 09 complete.")
 
 
 if __name__ == "__main__":

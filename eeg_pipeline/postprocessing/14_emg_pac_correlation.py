@@ -1,6 +1,6 @@
-# eeg_pipeline/postprocessing/17_emg_pac_correlation.py
+# eeg_pipeline/postprocessing/14_emg_pac_correlation.py
 """
-Step 17: Group-level EMG-PAC sensitivity check.
+Step 14: Group-level EMG-PAC sensitivity check.
 
 Correlates delta-EMG (B5-B1 EMG PC1 variance) with delta-PAC (B5-B1 PAC z)
 across participants. If r is weak, PAC fatigue effect is robust to EMG.
@@ -8,6 +8,8 @@ across participants. If r is weak, PAC fatigue effect is robust to EMG.
 Also correlates within-block EMG variance with PAC z-score.
 """
 import sys
+import argparse
+import os
 from pathlib import Path
 
 pipeline_dir = Path(__file__).resolve().parents[1]
@@ -20,22 +22,47 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from src.utils_io import parse_subject_filter, subject_matches
+
 OUTPUT_DIR = pipeline_dir / "outputs" / "features"
 FIG_DIR = pipeline_dir / "outputs" / "analysis_figures"
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 
+def _corr_pair(x, y):
+    """Return correlations only when enough non-constant paired data exist."""
+    x = pd.Series(x, dtype="float64")
+    y = pd.Series(y, dtype="float64")
+    mask = x.notna() & y.notna()
+    x = x[mask]
+    y = y[mask]
+    if len(x) < 2 or x.nunique() < 2 or y.nunique() < 2:
+        return np.nan, np.nan, np.nan, np.nan
+    r, p = stats.pearsonr(x, y)
+    rho, p_rho = stats.spearmanr(x, y)
+    return r, p, rho, p_rho
+
+
 def main():
+    parser = argparse.ArgumentParser(description="Group-level EMG-PAC sensitivity check.")
+    parser.add_argument(
+        "--subject",
+        default=os.environ.get("EEG_SUBJECT_FILTER", ""),
+        help="Optional subject filter for the input rows.",
+    )
+    args = parser.parse_args()
+    selected_subjects = parse_subject_filter(args.subject)
+
     # Load EMG block-level summary
     emg_path = OUTPUT_DIR / "emg_covariates_block.csv"
     if not emg_path.exists():
-        raise FileNotFoundError(f"{emg_path} not found. Run step 16 first.")
+        raise FileNotFoundError(f"{emg_path} not found. Run step 13 first.")
     emg_df = pd.read_csv(emg_path)
 
     # Load PAC z-scores
     pac_path = OUTPUT_DIR / "pac_between_features.csv"
     if not pac_path.exists():
-        raise FileNotFoundError(f"{pac_path} not found. Run step 10 first.")
+        raise FileNotFoundError(f"{pac_path} not found. Run step 08 first.")
     pac_df = pd.read_csv(pac_path)
 
     # Get the PAC column (should be pac_between_C_broad_F_C_broad_P)
@@ -52,17 +79,24 @@ def main():
         how="inner",
     )
     merged.rename(columns={pac_col: "pac_z"}, inplace=True)
+    if selected_subjects:
+        merged = merged[
+            merged["subject"].apply(lambda s: subject_matches(str(s), selected_subjects))
+        ].reset_index(drop=True)
 
     print("=" * 60)
-    print("Step 17: EMG-PAC Group-Level Sensitivity")
+    print("Step 14: EMG-PAC Group-Level Sensitivity")
     print("=" * 60)
+
+    if merged.empty:
+        print("No overlapping EMG and PAC rows found.")
+        return
 
     # --- Analysis 1: Within-block correlation (EMG std vs PAC z) ---
     print("\n--- Within-block: EMG variance vs PAC z-score ---")
     for block in sorted(merged["block"].unique()):
         bdf = merged[merged["block"] == block]
-        r, p = stats.pearsonr(bdf["emg_pc1_std"], bdf["pac_z"])
-        rho, p_rho = stats.spearmanr(bdf["emg_pc1_std"], bdf["pac_z"])
+        r, p, rho, p_rho = _corr_pair(bdf["emg_pc1_std"], bdf["pac_z"])
         print(f"  Block {block}: r={r:.3f} (p={p:.3f}), rho={rho:.3f} (p={p_rho:.3f}), N={len(bdf)}")
 
     # --- Analysis 2: Delta correlation ---
@@ -89,13 +123,23 @@ def main():
 
     delta_df = pd.DataFrame(deltas)
     print(f"\n--- Delta analysis (B5 - B1): N = {len(delta_df)} ---")
+    if len(delta_df) < 2:
+        print("Not enough complete participants for delta correlation.")
+        return
 
-    r_delta, p_delta = stats.pearsonr(delta_df["delta_emg_std"], delta_df["delta_pac_z"])
-    rho_delta, p_rho_delta = stats.spearmanr(delta_df["delta_emg_std"], delta_df["delta_pac_z"])
+    r_delta, p_delta, rho_delta, p_rho_delta = _corr_pair(
+        delta_df["delta_emg_std"], delta_df["delta_pac_z"]
+    )
     print(f"  Pearson:  r = {r_delta:.3f}, p = {p_delta:.3f}")
     print(f"  Spearman: rho = {rho_delta:.3f}, p = {p_rho_delta:.3f}")
     print()
     print(delta_df.to_string(index=False))
+    if not np.isfinite(r_delta):
+        out_csv = OUTPUT_DIR / "emg_pac_delta_correlation.csv"
+        delta_df.to_csv(out_csv, index=False)
+        print("\nDelta correlation not estimable because the paired data are constant or incomplete.")
+        print(f"  Saved delta table: {out_csv}")
+        return
 
     # --- Interpretation ---
     print(f"\n--- Interpretation ---")
@@ -119,7 +163,7 @@ def main():
     for _, row in b1.iterrows():
         ax.annotate(row["subject"].replace("sub-", ""), (row["emg_pc1_std"], row["pac_z"]),
                      fontsize=7, ha="left", va="bottom")
-    r1, p1 = stats.pearsonr(b1["emg_pc1_std"], b1["pac_z"])
+    r1, p1, _, _ = _corr_pair(b1["emg_pc1_std"], b1["pac_z"])
     ax.set_xlabel("EMG PC1 SD", fontsize=11)
     ax.set_ylabel("PAC z-score", fontsize=11)
     ax.set_title(f"Block 1: r={r1:.2f}, p={p1:.3f}", fontsize=12, fontweight="bold")
@@ -134,7 +178,7 @@ def main():
     for _, row in b5.iterrows():
         ax.annotate(row["subject"].replace("sub-", ""), (row["emg_pc1_std"], row["pac_z"]),
                      fontsize=7, ha="left", va="bottom")
-    r5, p5 = stats.pearsonr(b5["emg_pc1_std"], b5["pac_z"])
+    r5, p5, _, _ = _corr_pair(b5["emg_pc1_std"], b5["pac_z"])
     ax.set_xlabel("EMG PC1 SD", fontsize=11)
     ax.set_ylabel("PAC z-score", fontsize=11)
     ax.set_title(f"Block 5: r={r5:.2f}, p={p5:.3f}", fontsize=12, fontweight="bold")

@@ -1,8 +1,8 @@
-# eeg_pipeline/postprocessing/10b_pac_emg_corrected.py
+# eeg_pipeline/postprocessing/08b_pac_emg_corrected.py
 """
-Step 10b — PAC with EMG-corrected gamma (Variant C sensitivity).
+Step 08b - PAC with EMG-corrected gamma (sensitivity analysis).
 
-Identical to step 10 PAC computation EXCEPT:
+Identical to step 08 PAC computation EXCEPT:
   Before computing gamma amplitude, regress out EMG PC1 from each trial's
   parietal signal at every time point. This removes the trial-level EMG
   contribution from the gamma envelope BEFORE the Hilbert transform.
@@ -13,13 +13,13 @@ Method:
     corrected_signal[trial, t] = residual[trial, t] + mean(parietal_signal[:, t])
 
   Then: gamma_amp = |Hilbert(bandpass(corrected_signal, 55-85 Hz))|
-  PAC is computed identically to step 10 using corrected gamma amp.
+  PAC is computed identically to step 08 using corrected gamma amp.
 
 Outputs:
   - pac_between_emg_corrected.csv (same format as pac_between_features.csv)
   - Figure: pac_emg_corrected_{subj}.png
 
-Does NOT modify step 10 or any existing outputs.
+Does NOT modify step 08 or any existing outputs.
 """
 import os
 import sys
@@ -164,6 +164,19 @@ def _pac_from_precomputed(theta_phase, gamma_amp, n_surr):
 
 
 def main():
+    parser = argparse.ArgumentParser(
+        description="PAC with EMG-corrected gamma (step 08b sensitivity analysis)"
+    )
+    parser.add_argument(
+        "--subject",
+        type=str,
+        default="",
+        help="Optional subject filter, e.g. sub-p001 or sub-p001,sub-p002.",
+    )
+    args = parser.parse_args()
+    if args.subject.strip():
+        os.environ["EEG_SUBJECT_FILTER"] = args.subject.strip()
+
     cfg = load_config()
     blocks = cfg.get('blocks', [1, 5])
     epochs_dir = pipeline_dir / "outputs" / "derivatives" / "epochs_clean"
@@ -186,7 +199,7 @@ def main():
     # Load EMG covariates
     emg_path = OUTPUT_DIR / "emg_covariates.csv"
     if not emg_path.exists():
-        raise FileNotFoundError(f"{emg_path} not found. Run step 16 first.")
+        raise FileNotFoundError(f"{emg_path} not found. Run step 13 first.")
     emg_df = pd.read_csv(emg_path)
 
     pac_cfg = get_param('pac', default={})

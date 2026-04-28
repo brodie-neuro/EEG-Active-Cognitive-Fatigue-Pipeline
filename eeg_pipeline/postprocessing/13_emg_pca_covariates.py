@@ -1,4 +1,4 @@
-# eeg_pipeline/analysis/20c_emg_pca_covariates.py
+# eeg_pipeline/postprocessing/13_emg_pca_covariates.py
 """
 EMG PCA covariates for gamma contamination control.
 
@@ -24,6 +24,7 @@ Outputs:
 """
 import os
 import sys
+import argparse
 from pathlib import Path
 
 import mne
@@ -199,6 +200,16 @@ def _plot_pca_diagnostics(subj, block, per_chan_trial, pca, channels, pc1_scores
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Build EMG PCA covariates for PAC sensitivity checks.")
+    parser.add_argument(
+        "--subject",
+        default=os.environ.get("EEG_SUBJECT_FILTER", ""),
+        help="Optional subject filter, e.g. sub-p001 or sub-p001,sub-p002.",
+    )
+    args = parser.parse_args()
+    if args.subject.strip():
+        os.environ["EEG_SUBJECT_FILTER"] = args.subject.strip()
+
     cfg = load_config()
     blocks = cfg.get("blocks", [1, 5])
     raw_dir = pipeline_dir / "outputs" / "derivatives" / "ica_cleaned_raw"

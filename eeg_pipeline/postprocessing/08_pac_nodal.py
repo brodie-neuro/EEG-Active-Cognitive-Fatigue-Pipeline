@@ -296,7 +296,7 @@ def _plot_pac_layout_B(subj, block_details):
 
 
 def _plot_pac_layout_C(subj, block_details):
-    """Layout C: Hybrid — scalp arrows (top) + surrogate distributions (bottom)."""
+    """Layout C: Hybrid scalp arrows plus phase-amplitude histograms."""
     sorted_blocks = sorted(block_details.keys())
     if len(sorted_blocks) < 2:
         return
@@ -310,7 +310,7 @@ def _plot_pac_layout_C(subj, block_details):
     ax_h1 = fig.add_subplot(2, 3, 1)
     ax_h2 = fig.add_subplot(2, 3, 2)
     ax_h3 = fig.add_subplot(2, 3, 3)
-    # Bottom row: 2 surrogate histograms + 1 summary
+    # Bottom row: 2 phase-amplitude histograms + 1 summary
     ax_s1 = fig.add_subplot(2, 3, 4)
     ax_s2 = fig.add_subplot(2, 3, 5)
     ax_sum = fig.add_subplot(2, 3, 6)
@@ -332,25 +332,19 @@ def _plot_pac_layout_C(subj, block_details):
                         _NODE_XY['C_broad_P'], clr, title)
         ax.set_title(title, fontsize=12, fontweight='bold', pad=12)
 
-    # --- Bottom left: B1 surrogate distribution ---
+    # --- Bottom left/middle: phase-amplitude profiles ---
     for ax, block, info, clr in [
         (ax_s1, b1, info_b1, _CLR_B1),
         (ax_s2, b5, info_b5, _CLR_B5),
     ]:
-        surr = info['surr_mis']
-        mean_s, std_s = np.mean(surr), np.std(surr)
-        ax.hist(surr, bins=40, color='lightgray', edgecolor='gray', lw=0.5)
-        ax.axvline(info['mi_real'], color='red', lw=2.5, label=f'Real MI')
-        ax.axvspan(mean_s - 2 * std_s, mean_s + 2 * std_s,
-                   alpha=0.1, color='blue', label='+-2 SD')
-        stats_txt = f"Z = {info['z']:.2f}\nMI = {info['mi_real']:.4f}"
+        _plot_phase_amp_profile(
+            ax, info, clr,
+            phase_label='Theta phase',
+            amp_label='Gamma amplitude (nV)',
+        )
+        stats_txt = f"Block {block}\nZ = {info['z']:.2f}\nMI = {info['mi_real']:.4f}"
         ax.text(0.97, 0.97, stats_txt, transform=ax.transAxes,
                 fontsize=9, va='top', ha='right', bbox=_STAT_BOX)
-        ax.set_xlabel('Modulation Index', fontsize=10)
-        ax.set_ylabel('Count', fontsize=10)
-        ax.set_title(f'Block {block} Surrogates', fontsize=11, fontweight='bold')
-        ax.legend(fontsize=7, loc='upper left')
-        _style_ax(ax)
 
     # --- Bottom right: Summary panel ---
     ax_sum.axis('off')
@@ -381,6 +375,53 @@ def _plot_pac_layout_C(subj, block_details):
     fig.savefig(out, dpi=150, bbox_inches='tight')
     plt.close(fig)
     print(f"  Saved Layout C (hybrid): {out}")
+
+
+def _plot_phase_amp_profile(ax, info, color, phase_label, amp_label):
+    """Plot mean amplitude by phase bin with a scaled phase-cycle reference."""
+    phase_bins = info.get('phase_bins')
+    mean_amp = np.asarray(info.get('mean_amp', []), dtype=float)
+    if phase_bins is None or mean_amp.size == 0:
+        ax.text(0.5, 0.5, "No phase-bin data", transform=ax.transAxes,
+                ha='center', va='center', fontsize=10)
+        ax.axis('off')
+        return
+
+    mean_amp = mean_amp * 1e9  # V -> nV for readability
+    bin_centers = (phase_bins[:-1] + phase_bins[1:]) / 2.0
+    x_deg = np.degrees(bin_centers)
+    width = 360 / len(mean_amp) * 0.82
+
+    ax.bar(x_deg, mean_amp, width=width, color=color, alpha=0.68,
+           edgecolor=color, linewidth=0.7, label='Mean amplitude')
+
+    ymax = float(np.nanmax(mean_amp)) if np.isfinite(mean_amp).any() else 1.0
+    if ymax <= 0:
+        ymax = 1.0
+
+    peak_idx = int(np.nanargmax(mean_amp))
+    peak_phase = x_deg[peak_idx]
+    ax.axvline(peak_phase, color='#263238', lw=1.2, ls='--', alpha=0.75,
+               label=f'Preferred phase ({peak_phase:.0f} deg)')
+
+    # Draw the phase carrier below the bars. It is a visual reference only,
+    # scaled to the axis so it cannot be mistaken for amplitude data.
+    wave_x = np.linspace(-180, 180, 361)
+    wave_y = -0.12 * ymax + 0.065 * ymax * np.sin(np.deg2rad(wave_x))
+    ax.plot(wave_x, wave_y, color='#263238', lw=1.3, alpha=0.85,
+            label='Phase reference (scaled)')
+    ax.axhline(0, color='#B0BEC5', lw=0.7, zorder=0)
+    ax.text(177, -0.205 * ymax, 'phase reference', fontsize=7,
+            color='#455A64', ha='right', va='bottom', style='italic')
+
+    ax.set_xlim(-190, 190)
+    ax.set_ylim(-0.24 * ymax, 1.18 * ymax)
+    ax.set_xticks([-180, -90, 0, 90, 180])
+    ax.set_xlabel(f'{phase_label} (deg)', fontsize=10)
+    ax.set_ylabel(amp_label, fontsize=10)
+    ax.set_title('Phase-amplitude profile', fontsize=11, fontweight='bold')
+    ax.legend(fontsize=7, loc='upper left', frameon=False)
+    _style_ax(ax)
 
 
 def _plot_pac_diagnostic(subj, block_details):
@@ -628,7 +669,15 @@ def _modulation_index(theta_phase, gamma_amp, n_bins=12, return_details=False):
 def main():
     parser = argparse.ArgumentParser(description='PAC analysis')
     parser.add_argument('--no-plots', action='store_true', help='Skip diagnostic figures')
+    parser.add_argument(
+        '--subject',
+        type=str,
+        default='',
+        help='Optional subject filter, e.g. sub-p001 or sub-p001,sub-p002',
+    )
     args, _ = parser.parse_known_args()
+    if args.subject.strip():
+        os.environ["EEG_SUBJECT_FILTER"] = args.subject.strip()
     do_plots = not args.no_plots
 
     cfg = load_config()

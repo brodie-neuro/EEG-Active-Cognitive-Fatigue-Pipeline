@@ -10,7 +10,7 @@ at the start of main(). This creates:
 
 Usage:
     from src.utils_logging import setup_pipeline_logger
-    logger = setup_pipeline_logger('10_pac_nodal')
+    logger = setup_pipeline_logger('08_pac_nodal')
     logger.info("Processing subject %s", subj)
     logger.error("File not found: %s", path)
 """

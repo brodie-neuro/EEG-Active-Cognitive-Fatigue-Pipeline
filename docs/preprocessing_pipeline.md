@@ -1,109 +1,74 @@
-# EEG Pre-Processing Pipeline
+# EEG Preprocessing Pipeline
 
-> **System:** NeurOsan Amplifier + Brain Products actiCAP (64 channels)
-> **Impedance Target:** <15 kΩ general; **<10 kΩ** for critical sites (Fz, Pz, Oz, T7, T8) to ensure clean gamma band signal.
+This document summarizes the active public preprocessing path. The live
+settings are defined in `eeg_pipeline/config/parameters.json` and the step
+scripts under `eeg_pipeline/preprocessing/`.
 
----
+## Step 01: Import and Filtering
 
-## Phase 1: Foundational Cleaning & Data Conditioning
+Raw participant blocks are imported, channel types are assigned, and EMG
+channels are excluded from EEG-specific processing. Two filtered streams are
+created:
 
-This phase focuses on loading data, establishing a clean reference, and removing major non-biological artefacts.
+- Main oscillatory stream: `1-100 Hz`, used for ASR, ICA, theta-gamma PAC, and alpha-gamma PAC.
+- ERP-only stream: `0.1-100 Hz`, used only for conservative P3b estimation.
 
-### Step 1: Load Data & Define Metadata
+The ERP branch does not feed ASR, ICA, PAC, or alpha-gamma PAC outputs.
 
-**What:** Load the raw data file (e.g., the 5-minute `.bdf` or `.eeg` file). Define electrode locations by loading a montage/channel locations file and confirm the sampling rate.
+## Step 02: Simple Average Reference
 
-**Why:** This gives the data its spatial context. The software knows that Fz is on the forehead and Oz is at the back of the head—essential for all subsequent spatial filtering and plotting.
+Bad EEG channels flagged during import/QC, plus any subject-specific known bad
+channels from participant config, are interpolated. A simple average reference
+is then applied to both the main oscillatory stream and the ERP-only stream.
 
----
+This replaces the older robust-reference path in order to keep the
+pipeline deterministic and easier to audit.
 
-### Step 2: Downsample the Data
+## Step 03: FIR Notch Filtering
 
-**What:** Reduce the sampling rate from the high recording rate (e.g., 1000 Hz) to a manageable rate (e.g., 500 Hz).
+Line noise is handled with deterministic FIR notch filters at `50 Hz` and
+`100 Hz` on both streams. The current public path does not use Zapline/DSS.
 
-**Why:** The highest frequency of interest is 85 Hz for gamma. Sampling at 500 Hz is more than five times that frequency—sufficient to capture the signal perfectly (Nyquist theorem). This makes data files smaller and processing faster without loss of important information.
+## Step 04: Artifact Subspace Reconstruction
 
----
+ASR is applied only to the main `1 Hz` high-pass oscillatory stream. The current
+cutoff is `30`, with clean-window calibration enabled. ASR modification rates
+are logged per block and blocks above the configured QC threshold are flagged
+for review.
 
-### Step 3: Robust Referencing (PyPREP)
+## Step 05: ICA and ICLabel
 
-**What:** Run the PyPREP pipeline on continuous data. This intelligent algorithm will:
+Extended Infomax ICA is fitted directly on the ASR-cleaned main oscillatory
+stream with `n_components = 25` and `random_state = 42`. ICLabel is then used to
+remove high-confidence ocular, cardiac, and muscle components according to the
+configured thresholds.
 
-1. Identify consistently "bad" channels (flat, disconnected, or extremely noisy)
-2. Calculate the average signal using only good channels
-3. Subtract this "clean average" from all good channels (re-referencing)
-4. Repair bad channels by interpolating from clean neighbours
+## Step 06: Epoching
 
-**Why:** This is the most critical step for maximising signal-to-noise ratio. Unlike simple average reference, this ensures noise from a few bad electrodes is not spread to all clean ones.
+Stimulus-locked epochs are created for:
 
----
+| Epoch set | Source stream | Window | Baseline | Purpose |
+|:----------|:--------------|:-------|:---------|:--------|
+| `p3b_erp` | ERP-only `0.1-100 Hz` branch | `-0.2 to 0.8 s` | `-0.2 to 0.0 s` | H3 P3b |
+| `pac` | Main `1-100 Hz` branch | `-0.5 to 1.8 s` | none | H1/H2 PAC |
 
-### Step 4: Advanced Line Noise Removal (Zapline-plus)
+For blocks with prepended practice trials, the configured task-relevant onsets
+are retained and practice onsets are discarded automatically.
 
-**What:** Apply advanced line noise filtering to remove 50 Hz electrical hum and harmonics (100 Hz, 150 Hz).
+## Step 07: Autoreject
 
-**Why:** Simple notch filters can distort brain signals at nearby frequencies. Zapline-plus removes line noise with surgical precision, leaving surrounding neural data untouched. Critical for PAC analysis that examines specific frequencies.
+Autoreject performs epoch-level repair and rejection with the configured
+cross-validation grid. It runs on the relevant epoch sets, including the
+dedicated `p3b_erp` branch and the main `pac` epochs.
 
----
+## Active Analysis Mapping
 
-## Phase 2: Biological & High-Amplitude Artefact Removal
+| Hypothesis | Step | Measure |
+|:-----------|:-----|:--------|
+| H1 | `postprocessing/08_pac_nodal.py` | theta-gamma PAC |
+| H2 | `postprocessing/09_alpha_gamma_pac.py` | alpha-gamma PAC |
+| H3 | `postprocessing/10_erp_p3b.py` | posterior P3b cluster |
 
-This phase uses algorithms to find and remove artefacts from the participant's body and movements.
-
-### Step 5: Band-Pass Filtering
-
-**What:** Apply a digital band-pass filter keeping only 1–100 Hz.
-
-**Why:** 
-- **1 Hz high-pass:** Removes slow signal drifts from sweat and electrode chemistry that confuse ICA
-- **100 Hz low-pass:** Removes high-frequency noise outside the range of interest (non-neural)
-
----
-
-### Step 6: Automated Artefact Repair (ASR)
-
-**What:** Run Artifact Subspace Reconstruction (ASR). This finds short, high-amplitude bursts of noise (muscle twitches, head movements, electrode jiggles) and repairs them.
-
-**Why:** Large, transient artefacts can dominate the signal and aren't easily removed by other methods. ASR cleans these segments without discarding entire trials, preserving valuable data. **Particularly effective at cleaning transient muscle noise that can contaminate the gamma band.**
-
----
-
-### Step 7: Independent Component Analysis (ICA + ICLabel)
-
-**What:** Run ICA to "un-mix" 64 channels into 64 independent components. Then use **ICLabel** to automatically classify each component:
-
-> "Component 1: Brain (90%), Component 2: Eye Movement (99%), Component 3: Muscle (95%)"
-
-**Why:** This is the primary tool for removing stereotyped, repetitive biological artefacts. Blinks, heartbeats, and eye movements have consistent electrical signatures. ICA isolates these into single components. **ICLabel makes the process objective and reproducible**, giving defensible, data-driven reasons for removing specific components.
-
-**Process:** Review ICLabel's suggestions, then remove components classified with high confidence as artefacts.
-
----
-
-## Phase 3: Segmentation & Final Quality Control
-
-This phase segments clean data into analysis windows and performs final checks.
-
-### Step 8: Epoching (Creating Trials)
-
-**What:** Segment the continuous clean data into epochs based on event markers. Create two separate sets:
-
-| Epoch Set | Time-Lock | Window | Purpose |
-|:----------|:----------|:-------|:--------|
-| **P3b Analysis** | Stimulus markers | −200 to +800 ms | ERP analysis |
-| **PAC/Theta Analysis** | Response markers | +200 to +1200 ms | Delay period (avoids stimulus and motor potential) |
-
-**Why:** Precisely isolates specific time windows relevant to different research questions.
-
----
-
-### Step 9: Final Epoch-Level Rejection/Repair (Autoreject)
-
-**What:** Run Autoreject on the newly created epoch sets.
-
-**Why:** Final quality control performing two crucial tasks:
-
-1. **Rejection:** Finds optimal voltage threshold to reject epochs that are too noisy
-2. **Repair:** If an epoch is mostly good but has brief artefact on one or two channels, repairs those channels for that epoch only
-
-**Outcome:** Two sets of clean, high-quality epochs with maximum possible trials retained for statistical analysis.
+`run_pipeline.py --mode full` runs the core path through step 11. EMG
+sensitivity is a follow-up workflow: run `13_emg_pca_covariates.py`, then
+`08b_pac_emg_corrected.py`, then `14_emg_pac_correlation.py`.

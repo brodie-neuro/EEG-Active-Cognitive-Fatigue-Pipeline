@@ -1,10 +1,10 @@
 # steps/02_simple_reference.py
 """
-Simplified Step 02: Simple average reference (no RANSAC, no eigendecomposition).
+Step 02: Simple average reference.
 
-Replaces the robust RANSAC reference with a simple arithmetic average reference.
-Only interpolates known bad channels from per-participant configs.
-This removes eigendecomposition #1 from the preprocessing chain.
+Interpolates known bad channels from per-participant configs, then applies a
+simple arithmetic average reference without decomposition-based reference
+estimation.
 """
 import argparse
 import os

@@ -32,9 +32,10 @@ PREPROCESS = [
 ]
 
 ANALYSIS = [
-    ("08 ERP P3b", f"{POSTPROCESS_DIR}/08_erp_p3b.py"),
-    ("10 PAC Nodal", f"{POSTPROCESS_DIR}/10_pac_nodal.py"),
-    ("13 Merge Features", f"{POSTPROCESS_DIR}/13_merge_features.py"),
+    ("08 PAC Nodal", f"{POSTPROCESS_DIR}/08_pac_nodal.py"),
+    ("09 Alpha Gamma PAC", f"{POSTPROCESS_DIR}/09_alpha_gamma_pac.py"),
+    ("10 ERP P3b", f"{POSTPROCESS_DIR}/10_erp_p3b.py"),
+    ("11 Merge Features", f"{POSTPROCESS_DIR}/11_merge_features.py"),
 ]
 
 DETERMINISM_ENV = {
@@ -121,7 +122,7 @@ def run_step(
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run EEG preprocessing/analysis pipeline.")
     parser.add_argument("--mode", choices=["full", "preprocess", "analysis"], default="full")
-    parser.add_argument("--subject", default="", help="Optional subject filter for steps that support --subject.")
+    parser.add_argument("--subject", default="", help="Optional subject filter for subject-aware steps.")
     parser.add_argument("--adapter", default="", help="Optional adapter JSON path.")
     parser.add_argument("--continue-on-error", action="store_true", help="Continue running after failed steps.")
     parser.add_argument(
@@ -158,6 +159,8 @@ def main() -> None:
 
     if args.adapter.strip():
         env["EEG_ADAPTER_PATH"] = str((PIPELINE_DIR / args.adapter).resolve() if not Path(args.adapter).is_absolute() else Path(args.adapter))
+    if args.subject.strip():
+        env["EEG_SUBJECT_FILTER"] = args.subject.strip()
 
     available_steps: list[tuple[str, str, bool]] = (
         [(name, path, True) for name, path in PREPROCESS]

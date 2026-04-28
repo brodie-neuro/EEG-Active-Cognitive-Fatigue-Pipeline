@@ -164,11 +164,8 @@ eeg_pipeline/preprocessing/00_migrate_outputs_to_subject_folders.py
 eeg_pipeline/preprocessing/00_view_raw.py
 eeg_pipeline/src/utils_clean.py
 eeg_pipeline/postprocessing/09_band_power.py
-eeg_pipeline/postprocessing/11_theta_wpli.py
 eeg_pipeline/postprocessing/12_gamma_power.py
 eeg_pipeline/postprocessing/15_theta_stim_specparam.py
-eeg_pipeline/postprocessing/21b_theta_wpli_comparison.py
-eeg_pipeline/hypothesis_testing/h2_wpli_lmm.py
 docs/generate_specparam_diagrams.py
 
 # --- 24. Local matplotlib cache ---
