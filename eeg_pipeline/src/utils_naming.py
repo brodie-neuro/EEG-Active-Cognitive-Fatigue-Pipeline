@@ -64,7 +64,7 @@ def get_feature_name(feature_type):
     Parameters
     ----------
     feature_type : str
-        Feature key (e.g. 'p3b', 'theta_power', 'pac_local', 'merged').
+        Feature key (e.g. 'p3b', 'pac_between', 'pac_local', 'merged').
 
     Returns
     -------
@@ -85,7 +85,7 @@ def get_figure_name(figure_type):
     Parameters
     ----------
     figure_type : str
-        Figure key (e.g. 'psd_specparam', 'pac_montage', 'p3b_erp').
+        Figure key (e.g. 'pac_montage', 'pac_between', 'p3b_erp').
 
     Returns
     -------

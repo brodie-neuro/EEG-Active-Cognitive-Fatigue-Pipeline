@@ -18,7 +18,7 @@
         "enabled": true,
         "hp_freq": 0.1,
         "epoch_type": "p3b_erp",
-        "_doc": "Dedicated low-cut ERP branch for conservative P3b estimation only. It does not feed ASR, ICA, PAC, theta power, theta wPLI, gamma, or specparam outputs."
+        "_doc": "Dedicated low-cut ERP branch for conservative P3b estimation only. It does not feed ASR, ICA, PAC, or alpha-gamma PAC outputs."
     },
     "asr": {
         "enabled": true,
@@ -97,31 +97,6 @@
         "tmin_peak": 0.3,
         "tmax_peak": 0.5
     },
-    "specparam": {
-        "freq_range": [
-            3,
-            30
-        ],
-        "peak_width_limits": [
-            1,
-            6
-        ],
-        "max_n_peaks": 6,
-        "min_peak_height": 0.05,
-        "aperiodic_mode": "fixed",
-        "zero_pad_factor": 4
-    },
-    "band_power": {
-        "theta_default": [
-            4.0,
-            8.0
-        ],
-        "theta_cf_channels": [
-            "Fz",
-            "FCz",
-            "Cz"
-        ]
-    },
     "pac": {
         "phase_band": [
             4,
@@ -133,43 +108,6 @@
         ],
         "n_surrogates": 500,
         "trim": 0.1
-    },
-    "itf": {
-        "channels": [
-            "Fz",
-            "FCz",
-            "Cz"
-        ],
-        "search_range": [
-            4.0,
-            8.0
-        ]
-    },
-    "traditional_peaks": {
-        "welch_win_sec": 12.0,
-        "welch_pad_factor": 4.0,
-        "tfr_win_sec": 12.0,
-        "tfr_step_sec": 6.0,
-        "detrend_1f": true,
-        "plot_log_power": true,
-        "psd_mode": "residual",
-        "maintenance_window_onset": [
-            0.8,
-            1.8
-        ],
-        "maintenance_pad_factor": 8.0,
-        "theta_band": [
-            3.0,
-            9.0
-        ],
-        "alpha_band": [
-            8.0,
-            12.0
-        ],
-        "beta_band": [
-            13.0,
-            30.0
-        ]
     },
     "qc": {
         "max_bad_channels_pct": 10,

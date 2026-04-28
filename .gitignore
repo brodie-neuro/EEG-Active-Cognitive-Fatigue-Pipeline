@@ -139,7 +139,7 @@ requirements_exact.txt
 *.csv
 vm*.txt
 vm_*.yml
-vm_*.sh
+vm*.sh
 write_*.py
 eigendecomp_*.py
 pac_power_sim.py
@@ -163,3 +163,40 @@ eeg_pipeline/preprocessing/03_zapline.py
 eeg_pipeline/preprocessing/00_migrate_outputs_to_subject_folders.py
 eeg_pipeline/preprocessing/00_view_raw.py
 eeg_pipeline/src/utils_clean.py
+eeg_pipeline/postprocessing/09_band_power.py
+eeg_pipeline/postprocessing/11_theta_wpli.py
+eeg_pipeline/postprocessing/12_gamma_power.py
+eeg_pipeline/postprocessing/15_theta_stim_specparam.py
+eeg_pipeline/postprocessing/21b_theta_wpli_comparison.py
+eeg_pipeline/hypothesis_testing/h2_wpli_lmm.py
+docs/generate_specparam_diagrams.py
+
+# --- 24. Local matplotlib cache ---
+.matplotlib/
+
+# --- 25. Local simulation scripts ---
+power_sim_pac.py
+
+# --- 26. Internal analysis and hypothesis testing ---
+eeg_pipeline/hypothesis_testing/
+eeg_pipeline/scripts/
+eeg_pipeline/analysis/
+eeg_pipeline/visualization/24_*.py
+projection_*.py
+
+# --- 27. Internal documentation (not for publication) ---
+manuscript_draft*.md
+methods_justification.md
+master_comparison_*.md
+
+# --- 28. VM run scripts and logs ---
+run_*.sh
+download_*.sh
+vm*.sh
+vm*.csv
+vm*.txt
+vm*.yml
+*_epoch_vm.py
+
+# --- 29. Temp data files ---
+*.tar.gz

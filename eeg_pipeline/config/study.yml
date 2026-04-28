@@ -12,11 +12,6 @@ behavioral_data: null                     # Path to d' CSV - set when available
 # Study-level structure only.
 # Algorithm settings live in eeg_pipeline/config/parameters.json.
 
-# Theta extraction node (FM-theta power + ITF)
-# Separate from h1_nodes - covers the frontal midline theta generators
-nodes:
-  CF: ['F1', 'Fz', 'F2', 'FCz', 'Cz']
-
 # Revised node structure (PAC pilot rerun, 2026-03-04)
 # C_broad: bilateral frontal->parietal (8+8 channels) - primary
 # Fz->Pz: single-channel descriptive pair - subset of C_broad

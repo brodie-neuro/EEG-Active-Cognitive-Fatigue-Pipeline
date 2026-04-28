@@ -1,13 +1,11 @@
-# postprocessing/14_merge_features.py
+# postprocessing/13_merge_features.py
 """
 Merge all individual feature CSVs into a single wide-format DataFrame.
 
 Reads:
   - p3b_features.csv
-  - theta_power_features.csv
-
-  - theta_freq_features.csv
   - pac_between_features.csv
+  - alpha_gamma_pac_features.csv
   - emg_covariates_block.csv
 
 Outputs:
@@ -47,16 +45,13 @@ def main():
 
     # --- Load all feature files ---
     p3b = load_feature("p3b_features.csv")
-    theta_power = load_feature("theta_power_features.csv")
-
-    theta_freq = load_feature("theta_freq_features.csv")
-    theta_stim = load_feature("theta_stim_features.csv")
     pac_between = load_feature("pac_between_features.csv")
+    alpha_gamma_pac = load_feature("alpha_gamma_pac_features.csv")
     emg_pca = load_feature("emg_covariates_block.csv")
 
     # --- Start with the most complete subject x block file ---
-    block_dfs = [df for df in [p3b, theta_power, theta_freq, theta_stim,
-                                pac_between, emg_pca] if df is not None]
+    block_dfs = [df for df in [p3b, pac_between, alpha_gamma_pac, emg_pca]
+                 if df is not None]
 
     if not block_dfs:
         print("No feature files found. Run analysis steps first.")

@@ -27,7 +27,7 @@ CHANNELS = ["Pz", "P1", "P2", "POz"]
 P3B_WINDOW = (0.300, 0.500)
 CROP = (-0.100, 0.650)
 LP_FREQ = 12.0
-EXCLUDE = ["sub-p005"]
+EXCLUDE = ["sub-p005", "sub-p010"]
 
 COLOR_B1 = "#2166AC"
 COLOR_B5 = "#B2182B"

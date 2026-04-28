@@ -41,15 +41,12 @@ jobs:
             'eeg_pipeline.preprocessing.06_epoch',
             'eeg_pipeline.preprocessing.07_autoreject',
             'eeg_pipeline.postprocessing.08_erp_p3b',
-            'eeg_pipeline.postprocessing.09_band_power',
             'eeg_pipeline.postprocessing.10_pac_nodal',
-            'eeg_pipeline.postprocessing.11_theta_wpli',
-            'eeg_pipeline.postprocessing.12_gamma_power',
             'eeg_pipeline.postprocessing.13_merge_features',
             'eeg_pipeline.postprocessing.14_preprocessing_qc_summary',
-            'eeg_pipeline.postprocessing.15_theta_stim_specparam',
             'eeg_pipeline.postprocessing.16_emg_pca_covariates',
-            'eeg_pipeline.postprocessing.17_emg_gamma_regression',
+            'eeg_pipeline.postprocessing.17_emg_pac_correlation',
+            'eeg_pipeline.postprocessing.18_alpha_gamma_pac',
           ]
           failed = []
           for mod in steps:

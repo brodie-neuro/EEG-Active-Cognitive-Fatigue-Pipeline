@@ -1,6 +1,6 @@
-# eeg_pipeline/postprocessing/17b_emg_pac_correlation.py
+# eeg_pipeline/postprocessing/17_emg_pac_correlation.py
 """
-Variant B: Group-level EMG-PAC sensitivity check.
+Step 17: Group-level EMG-PAC sensitivity check.
 
 Correlates delta-EMG (B5-B1 EMG PC1 variance) with delta-PAC (B5-B1 PAC z)
 across participants. If r is weak, PAC fatigue effect is robust to EMG.
@@ -44,10 +44,6 @@ def main():
         raise KeyError("No pac_between columns found.")
     pac_col = pac_cols[0]
 
-    # Load EMG regression R2
-    reg_path = OUTPUT_DIR / "gamma_emg_regression_summary.csv"
-    reg_df = pd.read_csv(reg_path) if reg_path.exists() else None
-
     # Merge EMG + PAC
     merged = pd.merge(
         emg_df[["subject", "block", "emg_pc1_std"]],
@@ -57,16 +53,8 @@ def main():
     )
     merged.rename(columns={pac_col: "pac_z"}, inplace=True)
 
-    if reg_df is not None:
-        merged = pd.merge(
-            merged,
-            reg_df[["subject", "block", "r_squared"]],
-            on=["subject", "block"],
-            how="left",
-        )
-
     print("=" * 60)
-    print("Variant B: EMG-PAC Group-Level Sensitivity")
+    print("Step 17: EMG-PAC Group-Level Sensitivity")
     print("=" * 60)
 
     # --- Analysis 1: Within-block correlation (EMG std vs PAC z) ---
@@ -177,7 +165,7 @@ def main():
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
-    fig.suptitle("EMG-PAC Sensitivity (Variant B)\nDoes EMG change predict PAC change?",
+    fig.suptitle("EMG-PAC Sensitivity\nDoes EMG change predict PAC change?",
                  fontsize=14, fontweight="bold")
     fig.tight_layout()
     out = FIG_DIR / "emg_pac_sensitivity_variantB.png"

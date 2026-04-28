@@ -10,9 +10,8 @@ at the start of main(). This creates:
 
 Usage:
     from src.utils_logging import setup_pipeline_logger
-    logger = setup_pipeline_logger('12_peak_frequencies')
+    logger = setup_pipeline_logger('10_pac_nodal')
     logger.info("Processing subject %s", subj)
-    logger.warning("No theta peak found for %s", subj)
     logger.error("File not found: %s", path)
 """
 import logging

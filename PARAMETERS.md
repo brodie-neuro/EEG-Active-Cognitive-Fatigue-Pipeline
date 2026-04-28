@@ -27,7 +27,7 @@ The pipeline is built around four practical goals:
 | Area | Current setting | Why it is used | Publication note |
 |:-----|:----------------|:---------------|:-----------------|
 | Bandpass filtering | shared preprocessing stream at `1-100 Hz` (`1 Hz` high-pass) | Keeps the main automated path simple: ASR and ICA both operate on the same incoming continuous stream rather than creating internal fit-only copies. | Keep manuscript and code aligned on the exact filter design and the fact that this is one shared preprocessing path. |
-| ERP-only branch | separate `0.1-100 Hz` branch for `p3b_erp` | Preserves a conservative low-cut path for P3b estimation without changing the live oscillatory path used by ASR, ICA, PAC, theta power, theta wPLI, gamma, or specparam outputs. | This distinction should be explicit anywhere the methods describe P3b versus oscillatory analyses. |
+| ERP-only branch | separate `0.1-100 Hz` branch for `p3b_erp` | Preserves a conservative low-cut path for P3b estimation without changing the live oscillatory path used by ASR, ICA, PAC, or alpha-gamma PAC outputs. | This distinction should be explicit anywhere the methods describe P3b versus oscillatory analyses. |
 | Line-noise handling | deterministic FIR notch at `50 Hz` and `100 Hz` | Removes mains contamination without introducing another decomposition-heavy preprocessing step. | Keep the manuscript aligned with the simplified public path rather than older internal variants. |
 | EEG reference | simple average reference after interpolating only known bad EEG channels | Keeps the reference step explicit and auditable while avoiding fresh data-driven bad-channel branching during production runs. | Subject-specific known bad EEG channels should remain locked in participant config. |
 | Subject-specific bad channels | `participant_configs/*.json` with `known_bad_eeg` and `known_bad_emg` | Makes known hardware or contact failures explicit and reproducible. | This is a strength of the repo and should be preserved. |
@@ -49,18 +49,15 @@ The pipeline is built around four practical goals:
 | PAC amplitude band | `55-85 Hz` gamma | Narrow enough to avoid lower-frequency bleed while still targeting task-relevant high gamma. | Important to keep coupled with the EMG-control story. |
 | PAC null model | `500` surrogates | Enough to generate a stable z-scored modulation index without making runtime unreasonable. | Reasonable compromise between speed and null stability. |
 | PAC edge trimming | `trim = 0.1 s` | Reduces edge artifacts in filtered analytic signals. | Sensible implementation detail worth keeping explicit. |
-| Theta synchrony | confirmatory frontoparietal theta wPLI in the stimulus window | Fits the hypothesis that fatigue alters communication across a control-relevant network rather than only local amplitude. | The confirmatory window should be documented consistently in script and manuscript. |
-| Spectral parameterization | `freq_range = 3-30`, `peak_width_limits = [1, 6]`, `max_n_peaks = 6`, `zero_pad_factor = 4` | Separates periodic peaks from the aperiodic background and improves frequency resolution for short stimulus-locked epochs. In this repo it is a descriptive follow-up, not a required preprocessing dependency for PAC. | Zero padding should be described carefully as improving frequency sampling, not creating new information. |
-| Theta power band | fixed theta `4-8` for FM-theta power | Keeps the confirmatory theta-power measure aligned with the same canonical theta regime used elsewhere, without individualising the analysis band. | This should be stated plainly as the live study position. |
-| Theta peak summaries | stimulus-period frontal-midline theta peak summaries from the descriptive specparam workflow | Provides descriptive frequency summaries without feeding back into the confirmatory theta-power or PAC band definitions. | Keep this distinction explicit in README and manuscript. |
+| Alpha-gamma PAC | exploratory/descriptive between-region alpha(8-13 Hz)-gamma(55-85 Hz) PAC in stimulus window | C_broad_F→C_broad_P, mirroring the frontoparietal topology of confirmatory theta-gamma PAC but indexing alpha-mediated executive gating (Miller et al., 2018). Follows from Mangan & Kourtis (2026) prediction that fatigue disrupts top-down alpha gating of WM representations. Same MI + surrogate method as confirmatory theta-gamma PAC. | Not inferential. Provides an a priori predictor for a powered follow-up study. |
 
 Method hierarchy to keep explicit:
 
-- The shared `1 Hz` high-pass path is the live oscillatory pipeline for ASR, ICA, PAC, theta power, theta wPLI, gamma, and descriptive specparam outputs.
+- The shared `1 Hz` high-pass path is the live oscillatory pipeline for ASR, ICA, theta-gamma PAC, and alpha-gamma PAC.
 - A separate `0.1 Hz` ERP branch exists only for conservative P3b estimation.
-- PAC phase band is fixed `4-8 Hz`.
-- Frontal midline theta power is fixed-band `4-8 Hz`.
-- Specparam outputs and frontal-midline theta peak summaries are descriptive only.
+- Confirmatory PAC phase band is fixed `4-8 Hz` (theta-gamma, H1).
+- Exploratory alpha-gamma PAC phase band is `8-13 Hz` (step 18).
+- Alpha-gamma PAC is descriptive only and does not feed confirmatory analyses.
 
 ## EMG and Gamma Quality Control
 
@@ -68,9 +65,9 @@ Method hierarchy to keep explicit:
 |:-----|:----------------|:---------------|:-----------------|
 | EMG channel strategy | temporalis bipolar pairs plus posterior neck channels | Gives direct physiological access to likely muscle contamination rather than inferring it only indirectly from scalp EEG. | One of the strongest design features in the pipeline. |
 | EMG summary metric | PCA on derived EMG signals, retain PC1 | Produces a compact global muscle-tension covariate for later QC. | Defensible and interpretable. |
-| Gamma contamination criterion | exclude blocks where EMG explains more than `25%` of gamma variance (`R^2 > 0.25`) | Makes the gamma story more credible by requiring a practical separation between neural and myogenic signal. | This threshold should stay clearly tied to the repo's conservative gamma policy. |
+| PAC gamma-amplitude contamination criterion | exclude blocks where EMG explains more than `25%` of PAC-target gamma variance (`R^2 > 0.25`) | Makes the PAC story more credible by requiring a practical separation between neural and myogenic signal at the gamma-amplitude target. | This threshold should stay clearly tied to the repo's conservative PAC policy. |
 
-`python eeg_pipeline/run_pipeline.py --mode full` stops at step 13. That means final PAC and gamma inclusion decisions still require manually running the EMG follow-up steps (`16_emg_pca_covariates.py` and `17_emg_gamma_regression.py`) before treating those outputs as inferentially final.
+`python eeg_pipeline/run_pipeline.py --mode full` stops at step 13. That means final PAC inclusion decisions still require manually running the EMG follow-up steps (`16_emg_pca_covariates.py` and `17_emg_pac_correlation.py`) before treating those outputs as inferentially final.
 
 ## QC Thresholds
 

@@ -83,7 +83,7 @@ def _draw_head(ax, lw=1.5):
 
 # Approximate 2D positions for frontal and parietal clusters
 _NODE_XY = {
-    'C_broad_F': (0.0, 0.30),   # frontal midline cluster
+    'C_broad_F': (0.0, 0.30),   # bilateral frontal cluster
     'C_broad_P': (0.0, -0.30),  # parietal midline cluster
 }
 

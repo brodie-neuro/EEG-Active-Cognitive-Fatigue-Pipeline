@@ -33,10 +33,7 @@ PREPROCESS = [
 
 ANALYSIS = [
     ("08 ERP P3b", f"{POSTPROCESS_DIR}/08_erp_p3b.py"),
-    ("09 Band Power", f"{POSTPROCESS_DIR}/09_band_power.py"),
     ("10 PAC Nodal", f"{POSTPROCESS_DIR}/10_pac_nodal.py"),
-    ("11 Theta wPLI", f"{POSTPROCESS_DIR}/11_theta_wpli.py"),
-    ("12 Gamma Power", f"{POSTPROCESS_DIR}/12_gamma_power.py"),
     ("13 Merge Features", f"{POSTPROCESS_DIR}/13_merge_features.py"),
 ]
 

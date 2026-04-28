@@ -10,7 +10,7 @@ Collects all preprocessing quality metrics into a single report:
   - Overall rejection rates
 
 Note: 'stimulus' epochs (-0.5 to 1.8s) are used for all oscillatory
-analyses: PAC, wPLI, theta power, gamma, and peak frequency.
+analyses: PAC and alpha-gamma PAC.
 The dedicated `p3b_erp` branch carries the conservative 0.1 Hz ERP epochs
 used by the P3b analysis, while the main `p3b` epochs remain available as
 the shared onset-clean trial mask used elsewhere in the oscillatory stack.
@@ -78,7 +78,7 @@ def _count_epochs(subj, block, outputs_dir):
         ('p3b_erp', 'p3b_erp'),
         ('pac', 'stim'),
     ]
-    for etype, out_label in epoch_labels:  # pac epochs = stimulus epochs (PAC, wPLI, theta, gamma)
+    for etype, out_label in epoch_labels:  # pac epochs = stimulus epochs (PAC)
         # Try per-subject layout first, then legacy flat layout
         for base in [outputs_dir / subj, outputs_dir]:
             raw_file = base / "derivatives" / "epochs" / f"{subj}_block{block}_{etype}-epo.fif"
