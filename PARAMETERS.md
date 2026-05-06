@@ -49,25 +49,30 @@ The pipeline is built around four practical goals:
 | PAC amplitude band | `55-85 Hz` gamma | Narrow enough to avoid lower-frequency bleed while still targeting task-relevant high gamma. | Important to keep coupled with the EMG-control story. |
 | PAC null model | `500` surrogates | Enough to generate a stable z-scored modulation index without making runtime unreasonable. | Reasonable compromise between speed and null stability. |
 | PAC edge trimming | `trim = 0.1 s` | Reduces edge artifacts in filtered analytic signals. | Sensible implementation detail worth keeping explicit. |
-| Alpha-gamma PAC | confirmatory H2 between-region alpha(8-13 Hz)-gamma(55-85 Hz) PAC in stimulus window | C_broad_F→C_broad_P, mirroring the frontoparietal topology of H1 theta-gamma PAC but indexing alpha-mediated executive gating and prioritisation (Miller et al., 2018). Same MI + surrogate method as H1. | Keep labelled as H2 anywhere the manuscript lists confirmatory outcomes. |
+| Alpha-gamma PAC | secondary H2 between-region alpha(8-13 Hz)-gamma(55-85 Hz) PAC in stimulus window | C_broad_F→C_broad_P, mirroring the frontoparietal topology of H1 theta-gamma PAC but indexing alpha-mediated executive gating and prioritisation (Miller et al., 2018). Same MI + surrogate method as H1. | Keep labelled as secondary H2 anywhere the manuscript lists confirmatory outcomes. |
+
+| PAC phase-band QC | `pac_phase_qc` defaults to theta `4-8 Hz` and alpha `8-13 Hz` on `C_broad_F`, using cleaned PAC epochs and the `0.0-0.6 s` PAC analysis window | QC-only check that the phase-providing bands used by theta-gamma and alpha-gamma PAC show plausible residual spectral support above the aperiodic background. Centre of mass is computed only from positive residual spectral mass. | Report as interpretability/QC support, not as a new primary power analysis. Do not treat missing residual support as a forced peak estimate. |
+| P3b visual QC | `p3b_qc` uses the configured `p3b_erp` branch, P3b ROI, and `0.3-0.5 s` measurement window | Produces participant dashboards with ROI waveform, single-trial images, channel traces, and topography so P3b plausibility can be reviewed quickly. | Keep descriptive; this does not change the P3b feature extraction method. |
 
 Method hierarchy to keep explicit:
 
 - The shared `1 Hz` high-pass path is the live oscillatory pipeline for ASR, ICA, theta-gamma PAC, and alpha-gamma PAC.
 - A separate `0.1 Hz` ERP branch exists only for conservative P3b estimation.
-- H1 theta-gamma PAC phase band is fixed `4-8 Hz` (step 08).
-- H2 alpha-gamma PAC phase band is fixed `8-13 Hz` (step 09).
-- H3 P3b is estimated only from the dedicated `p3b_erp` branch (step 10).
+- Primary H1 theta-gamma PAC phase band is fixed `4-8 Hz` (step 08).
+- Secondary H2 alpha-gamma PAC phase band is fixed `8-13 Hz` (step 09).
+- Steps 09 and 09b both read the H2 settings from `alpha_gamma_pac` in `parameters.json`, so the alpha-gamma EMG sensitivity script differs from theta-gamma 08b only by the configured phase band and output target.
+- `alpha_gamma_pac.analysis_excluded_subjects` defines the QC-based H2 exclusion set used by alpha-gamma inference and alpha-gamma EMG sensitivity diagnostics. Raw feature extraction can still compute all rows for auditability.
+- Secondary H3 P3b is estimated only from the dedicated `p3b_erp` branch (step 10).
 
 ## EMG and Gamma Quality Control
 
 | Area | Current setting | Why it is used | Publication note |
 |:-----|:----------------|:---------------|:-----------------|
-| EMG channel strategy | temporalis bipolar pairs plus posterior neck channels | Gives direct physiological access to likely muscle contamination rather than inferring it only indirectly from scalp EEG. | One of the strongest design features in the pipeline. |
+| EMG channel strategy | temporalis bipolar pairs plus posterior neck channels | Gives direct physiological access to likely muscle contamination rather than inferring it only indirectly from scalp EEG. | Important design feature in the pipeline. |
 | EMG summary metric | PCA on derived EMG signals, retain PC1 | Produces a compact global muscle-tension covariate for later QC. | Defensible and interpretable. |
-| PAC gamma-amplitude contamination criterion | exclude blocks where EMG explains more than `25%` of PAC-target gamma variance (`R^2 > 0.25`) | Makes the PAC story more credible by requiring a practical separation between neural and myogenic signal at the gamma-amplitude target. | This threshold should stay clearly tied to the repo's conservative PAC policy. |
+| PAC gamma-amplitude contamination handling | no automatic threshold-based EMG exclusion is applied to confirmatory PAC outputs | Keeps EMG handling as layered sensitivity evidence rather than a hard inclusion gate. | Manuscript wording should describe EMG analyses as sensitivity/diagnostic controls unless a thresholded exclusion rule is explicitly reintroduced. |
 
-`python eeg_pipeline/run_pipeline.py --mode full` stops at step 11. That means final PAC inclusion decisions still require manually running the EMG follow-up steps in dependency order: `13_emg_pca_covariates.py`, then `08b_pac_emg_corrected.py`, then `14_emg_pac_correlation.py`.
+`python eeg_pipeline/run_pipeline.py --mode full` runs the main preprocessing, confirmatory analyses, and integrated QC workflows. EMG follow-up steps remain manual sensitivity diagnostics: `13_emg_pca_covariates.py`, then `08b_pac_emg_corrected.py` / `09b_alpha_gamma_pac_emg_corrected.py`, then `14_emg_pac_correlation.py` / `15_emg_alpha_gamma_correlation.py`.
 
 ## QC Thresholds
 
@@ -83,6 +88,8 @@ These thresholds are intended to keep the pipeline automated while still making 
 | `qc.min_trials_per_block` | `50` | Ensures a minimum amount of data survives for downstream analyses. | Should stay justified in terms of stability and interpretability, not just convenience. |
 | `qc.p3b_latency_range_ms` | `250-600` | Broad plausibility window for posterior ERP peaks. | Sensible QC bound. |
 | `qc.p3b_min_amplitude_uv` | `0.5` | Avoids treating near-flat peaks as meaningful P3b responses. | More of a sanity check than a strict inferential rule. |
+| `pac_phase_qc.classification` | configurable residual-support thresholds | Separates clear, weak, and indeterminate phase-band support without Gaussian peak fitting. | Thresholds are descriptive QC criteria, not inferential exclusions. |
+| `p3b_qc.classification` | configurable mean-amplitude and missing-channel flags | Makes participant-level P3b dashboards easy to triage. | Status labels should guide review, not automatically rewrite confirmatory results. |
 
 ## Determinism Choices
 

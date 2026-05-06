@@ -195,13 +195,13 @@ def generate_block(block_num, rng):
     info = mne.create_info(ch_names=ch_names, sfreq=SFREQ, ch_types=ch_types)
     info.set_montage(mont, match_case=False)
 
-    # ---- Base EEG (Lower noise for clean ERPs) ----
+    # ---- Base EEG ----
     data = np.zeros((n_ch, n_samp), dtype=float)
 
     for i in range(len(eeg_names)):
         base = pink_noise(n_samp, rng)
-        white = rng.normal(0, 0.05, n_samp)  # Reduced white noise for cleaner plots
-        # Very low noise background so ERPs are pristine
+        white = rng.normal(0, 0.05, n_samp)  # Low white noise for visible ERP morphology
+        # Low-amplitude background noise for synthetic ERP demonstrations
         data[i] = (base + white) * 5e-6 
 
     # Slow drift
@@ -223,7 +223,7 @@ def generate_block(block_num, rng):
                                              phase=float(rng.uniform(0, 2 * np.pi)))
 
     # Tonic high gamma (broadband, low amplitude)
-    # Present across cortex but strongest parietal -- provides baseline
+    # Present across cortex but largest at parietal sites; provides baseline
     # for PAC amplitude extraction and realistic PSD shape
     gamma_scale = gamma_tonic_scale
     for ch in eeg_names:
@@ -269,7 +269,7 @@ def generate_block(block_num, rng):
     # Maintenance-onset triggers (Trigger 2, at +800 ms post-stimulus)
     onsets_maintenance = onsets_stim + MAINTENANCE_OFFSET
 
-    # ---- ERPs (Textbook P3b) ----
+    # ---- ERPs ----
     # 800ms window
     t_erp = np.linspace(0, 0.8, int(0.8 * SFREQ))
     

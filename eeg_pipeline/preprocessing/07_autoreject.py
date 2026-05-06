@@ -140,11 +140,11 @@ def main():
     qc_dir = pipeline_root / "outputs" / "qc_figs" / "autoreject"
     debug_dir = pipeline_root / "outputs" / "features" / "autoreject_debug"
     erp_branch_cfg = get_param("erp_branch", default={}) or {}
-    epoch_types = ["p3b", "pac"]
+    epoch_types = ["pac"]
     if bool(erp_branch_cfg.get("enabled", False)):
         erp_epoch_type = str(erp_branch_cfg.get("epoch_type", "p3b_erp"))
         if erp_epoch_type not in epoch_types:
-            epoch_types.insert(1, erp_epoch_type)
+            epoch_types.insert(0, erp_epoch_type)
 
     qc_dir.mkdir(parents=True, exist_ok=True)
     debug_dir.mkdir(parents=True, exist_ok=True)

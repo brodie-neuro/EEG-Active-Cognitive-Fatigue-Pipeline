@@ -1,15 +1,14 @@
 # postprocessing/10_erp_p3b.py
 """
-P3b ERP Analysis
+P3b ERP analysis.
 
-Extracts P3b amplitude (300-500 ms) and peak latency from target trials
-at centroparietal electrodes. Outputs long format:
+Extracts P3b mean amplitude (300-500 ms) and fractional area latency
+from target trials at centroparietal electrodes. Outputs long format:
 one row per subject x block.
 
 Uses the dedicated low-cut ERP branch (`p3b_erp`) so conservative P3b
 estimation does not alter the main 1 Hz oscillatory pipeline.
 
-Reference: post_processing_EEG_plan_v2.docx, Step 1
 """
 import argparse
 import os
@@ -50,7 +49,7 @@ _STAT_BOX = dict(boxstyle='round,pad=0.4', facecolor='#ECEFF1', edgecolor='#B0BE
 
 
 def _style_ax(ax):
-    """Apply publication style: remove top/right spines, light grid."""
+    """Apply the standard plot style: remove top/right spines, light grid."""
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.grid(True, alpha=0.3)

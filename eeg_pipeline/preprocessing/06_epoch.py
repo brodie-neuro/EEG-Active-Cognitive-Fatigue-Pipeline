@@ -1,7 +1,6 @@
 # steps/06_epoch.py
 """
-Step 06: Epoch creation for P3b and PAC analysis.
-Creates two separate epoch sets with different time-locking.
+Step 06: Epoch creation for PAC and dedicated ERP-branch P3b analysis.
 """
 import argparse
 import os
@@ -128,7 +127,6 @@ def main():
     
     pipeline_root = Path(__file__).resolve().parents[1]
     input_dir = pipeline_root / "outputs" / "derivatives" / "ica_cleaned_raw"
-    output_dir = pipeline_root / "outputs" / "derivatives" / "epochs"
     erp_branch_cfg = get_param("erp_branch", default={}) or {}
     erp_branch_enabled = bool(erp_branch_cfg.get("enabled", False))
     erp_epoch_type = str(erp_branch_cfg.get("epoch_type", "p3b_erp"))
@@ -146,7 +144,6 @@ def main():
         print(f"--- Processing {subj} (Epoching) ---")
         subj_epochs_dir = subject_derivatives_dir(subj, "epochs")
         subj_epochs_dir.mkdir(parents=True, exist_ok=True)
-        epochs_p3b = None
         epochs_pac = None
         epochs_p3b_erp = None
         
@@ -158,16 +155,14 @@ def main():
         block_num = int(block_str[-1]) if block_str else 1
         qc = QCReport(subj, block_num)
 
-        p3b_cfg = get_param('epoching', 'p3b', default={})
+        erp_p3b_cfg = get_param('epoching', 'p3b', default={})
         pac_cfg_params = get_param('epoching', 'pac', default={})
-        if not p3b_cfg or not pac_cfg_params:
+        if not erp_p3b_cfg or not pac_cfg_params:
             raise KeyError("Missing required epoching.p3b or epoching.pac config.")
 
         practice_cfg = get_param('epoching', 'practice_trim', default={}) or {}
-        
-        # P3b Epochs: Stimulus ONSET locked only (Trigger 1), -200 to +800 ms
-        # Exclude stim/offset events (Trigger 2) -- those mark end of stimulus
-        print("Creating P3b epochs (stimulus-onset-locked)...")
+
+        # Apply the same practice trimming to the main-path PAC epochs.
         onset_event_rows, practice_meta = _trim_practice_onsets(
             onset_event_rows, block_num, practice_cfg
         )
@@ -176,20 +171,10 @@ def main():
                 f"  Trimmed {practice_meta['dropped_n']} prepended practice onset trials "
                 f"from block {block_num}; keeping final {practice_meta['after_n']} task onsets."
             )
-        p3b_tmin = p3b_cfg.get('tmin', -0.2)
-        p3b_tmax = p3b_cfg.get('tmax', 0.8)
-        p3b_baseline = tuple(p3b_cfg.get('baseline', [-0.2, 0.0]))
-        epochs_p3b = mne.Epochs(
-            raw, onset_event_rows, stim_events,
-            tmin=p3b_tmin, tmax=p3b_tmax,
-            baseline=p3b_baseline,
-            preload=True,
-            reject=None,  # Autoreject handles this in Step 08
-            verbose=False
-        )
-        p3b_out = subj_epochs_dir / f"{subj}_p3b-epo.fif"
-        epochs_p3b.save(p3b_out, overwrite=True)
-        print(f"  P3b epochs: {len(epochs_p3b)} trials")
+
+        p3b_tmin = erp_p3b_cfg.get('tmin', -0.2)
+        p3b_tmax = erp_p3b_cfg.get('tmax', 0.8)
+        p3b_baseline = tuple(erp_p3b_cfg.get('baseline', [-0.2, 0.0]))
 
         if erp_branch_enabled:
             erp_raw_path = subject_derivatives_dir(subj, "erp_notch_raw") / f"{subj}_notch-raw.fif"
@@ -248,7 +233,6 @@ def main():
         print(f"  PAC epochs: {len(epochs_pac)} trials")
         
         # QC report
-        n_p3b = len(epochs_p3b) if epochs_p3b is not None else 0
         n_pac = len(epochs_pac) if epochs_pac is not None else 0
         n_p3b_erp = len(epochs_p3b_erp) if epochs_p3b_erp is not None else 0
         qc.log_step('06_epoch', status='PASS',
@@ -257,17 +241,14 @@ def main():
                          'n_onset_events_before_trim': int(practice_meta['before_n']),
                          'n_onset_events_after_trim': int(practice_meta['after_n']),
                          'n_practice_onsets_dropped': int(practice_meta['dropped_n']),
-                         'n_p3b_epochs': n_p3b,
                          'n_p3b_erp_epochs': n_p3b_erp,
                          'n_pac_epochs': n_pac,
                       })
         qc.save_report()
         output_file = {
-            "p3b": str(p3b_out),
             "pac": str(pac_out),
         }
         output_hash = {
-            "p3b": file_sha256(p3b_out),
             "pac": file_sha256(pac_out),
         }
         if p3b_erp_out is not None:
@@ -284,13 +265,12 @@ def main():
                 "output_file": output_file,
                 "output_hash": output_hash,
                 "parameters_used": {
-                    "p3b": p3b_cfg,
+                    "erp_p3b": erp_p3b_cfg,
                     "pac": pac_cfg_params,
                     "erp_branch": erp_branch_cfg if erp_branch_enabled else None,
                 },
                 "step_specific": {
                     "n_epochs": {
-                        "p3b": int(n_p3b),
                         "p3b_erp": int(n_p3b_erp),
                         "pac": int(n_pac),
                     },

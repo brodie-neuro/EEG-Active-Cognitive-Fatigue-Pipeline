@@ -15,10 +15,11 @@ alpha-mediated executive gating rather than theta-mediated temporal
 organisation of WM content.
 
 Motivation:
-  - Mangan & Kourtis (2026, JoCN) proposed that cognitive fatigue
-    disrupts top-down alpha-mediated gating of WM representations.
-  - Miller et al. (2018, Neuron) — alpha/beta as top-down gating of
-    gamma content in WM 2.0 framework.
+  - Mangan & Kourtis (2026, Journal of Cognitive Neuroscience) frame active
+    cognitive fatigue as a working-memory control problem with testable
+    electrophysiological predictions.
+  - Miller et al. (2018, Neuron) discusses alpha/beta top-down gating of
+    gamma content in working memory.
 
 Method: identical to step 08
   - Trial-concatenated MI (Tort et al., 2010)
@@ -56,6 +57,7 @@ pipeline_dir = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(pipeline_dir))
 
 from src.utils_io import load_config, discover_subjects
+from src.utils_config import get_param
 from src.utils_features import (
     load_block_epochs, get_subjects_with_blocks,
     available_channels, filter_excluded_channels,
@@ -67,16 +69,21 @@ FIG_DIR = pipeline_dir / "outputs" / "figures" / "pac"
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 
 # ── Constants ──
-ALPHA_BAND = (8.0, 13.0)
-GAMMA_BAND = (55.0, 85.0)
-N_SURROGATES = 500
-RANDOM_SEED = 42
-PAC_WINDOW = (0.0, 0.6)
-N_BINS = 12  # match step 08 (30 deg bins)
+ALPHA_GAMMA_CFG = get_param("alpha_gamma_pac", default={}) or {}
+PHASE_NODE = ALPHA_GAMMA_CFG.get("phase_node", "C_broad_F")
+AMP_NODE = ALPHA_GAMMA_CFG.get("amp_node", "C_broad_P")
+ALPHA_BAND = tuple(float(v) for v in ALPHA_GAMMA_CFG.get("phase_band", [8.0, 13.0]))
+GAMMA_BAND = tuple(float(v) for v in ALPHA_GAMMA_CFG.get("amp_band", [55.0, 85.0]))
+N_SURROGATES = int(ALPHA_GAMMA_CFG.get("n_surrogates", 500))
+RANDOM_SEED = int(ALPHA_GAMMA_CFG.get("random_seed", 42))
+PAC_WINDOW = tuple(float(v) for v in ALPHA_GAMMA_CFG.get("analysis_window", [0.0, 0.6]))
+N_BINS = int(ALPHA_GAMMA_CFG.get("n_bins", 12))  # match step 08 (30 deg bins)
 
 
 
 OUTPUT_TAG = os.environ.get("EEG_OUTPUT_TAG", "").strip()
+PRIMARY_VARIANT = "frontal_alpha_to_parietal_gamma"
+LEGACY_VARIANTS = {"frontal_alpha->parietal_gamma"}
 
 
 def _tag_path(base, directory):
@@ -84,6 +91,19 @@ def _tag_path(base, directory):
     if OUTPUT_TAG:
         s = f"{s}_{OUTPUT_TAG}"
     return directory / f"{s}{ext}"
+
+
+def _normalise_alpha_gamma_rows(df):
+    """Normalise legacy alpha-gamma labels from earlier local outputs."""
+    if df is None or df.empty:
+        return df
+    df = df.copy()
+    if "variant" in df.columns:
+        legacy_mask = df["variant"].astype(str).isin(LEGACY_VARIANTS)
+        df.loc[legacy_mask, "variant"] = PRIMARY_VARIANT
+        if "role" in df.columns:
+            df.loc[df["variant"].astype(str).eq(PRIMARY_VARIANT), "role"] = "CONFIRMATORY"
+    return df
 
 
 # ── Signal extraction ──
@@ -329,12 +349,20 @@ def _setup_logging():
 
 
 def _save_incremental(rows, out_csv, logger):
-    """Save current results to CSV after each participant."""
+    """Save current results to CSV, merging with any existing data."""
     if not rows:
         return
-    df = pd.DataFrame(rows)
-    df.to_csv(out_csv, index=False)
-    logger.info(f"Incremental save: {len(rows)} rows -> {out_csv}")
+    df_new = _normalise_alpha_gamma_rows(pd.DataFrame(rows))
+    new_subjects = df_new['subject'].unique()
+    if Path(out_csv).exists():
+        df_existing = _normalise_alpha_gamma_rows(pd.read_csv(out_csv))
+        df_existing = df_existing[~df_existing['subject'].isin(new_subjects)]
+        df_merged = pd.concat([df_existing, df_new], ignore_index=True)
+    else:
+        df_merged = df_new
+    df_merged = _normalise_alpha_gamma_rows(df_merged)
+    df_merged.to_csv(out_csv, index=False)
+    logger.info(f"Incremental save: {len(df_merged)} rows -> {out_csv}")
 
 
 # ── Main ──
@@ -374,18 +402,18 @@ def main():
 
     # Load node channels
     h1_nodes = cfg.get('h1_nodes', {})
-    frontal_chs = h1_nodes.get('C_broad_F', [])
-    parietal_chs = h1_nodes.get('C_broad_P', [])
+    frontal_chs = h1_nodes.get(PHASE_NODE, [])
+    parietal_chs = h1_nodes.get(AMP_NODE, [])
 
     # Single between-region PAC variant: frontal alpha → parietal gamma
     variants = [
         {
-            'label': 'frontal_alpha_to_parietal_gamma',
+            'label': PRIMARY_VARIANT,
             'role': 'CONFIRMATORY',
             'phase_chs': frontal_chs,
-            'phase_desc': 'C_broad_F',
+            'phase_desc': PHASE_NODE,
             'amp_chs': parietal_chs,
-            'amp_desc': 'C_broad_P',
+            'amp_desc': AMP_NODE,
         },
     ]
 
@@ -480,13 +508,21 @@ def main():
 
     # ── Final summary ──
     if rows:
-        df = pd.DataFrame(rows)
-        df.to_csv(out_csv, index=False)
+        df_new = _normalise_alpha_gamma_rows(pd.DataFrame(rows))
+        new_subjects = df_new['subject'].unique()
+        if Path(out_csv).exists():
+            df_existing = _normalise_alpha_gamma_rows(pd.read_csv(out_csv))
+            df_existing = df_existing[~df_existing['subject'].isin(new_subjects)]
+            df_final = pd.concat([df_existing, df_new], ignore_index=True)
+        else:
+            df_final = df_new
+        df_final = _normalise_alpha_gamma_rows(df_final)
+        df_final.to_csv(out_csv, index=False)
         logger.info(f"\nFinal save: alpha-gamma PAC features -> {out_csv}")
         summary_cols = ['subject', 'block', 'variant', 'role', 'z_score',
                         'mi_real', 'n_trials']
-        avail_cols = [c for c in summary_cols if c in df.columns]
-        logger.info("\n" + df[avail_cols].to_string(index=False))
+        avail_cols = [c for c in summary_cols if c in df_final.columns]
+        logger.info("\n" + df_final[avail_cols].to_string(index=False))
 
     # Generate plots
     if do_plots and plot_data:

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="logo/Logo.png" alt="Pipeline Logo" width="400"/>
+</p>
+
 # EEG Active Cognitive Fatigue Pipeline
 
 [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -8,54 +12,85 @@
 
 ## Overview
 
-This repository contains a scripted EEG preprocessing and analysis pipeline for studying active cognitive fatigue. It is designed for 64-channel EEG, with a specific emphasis on:
+This repository contains a scripted EEG pre-processing and analysis pipeline for studying active cognitive fatigue. It is designed for 64-channel EEG, with a specific emphasis on:
 
-- preserving task-relevant gamma-band signal rather than cleaning it away aggressively
-- quantifying frontoparietal theta-gamma PAC, alpha-gamma PAC, and P3b as confirmatory measures
-- using a simplified default preprocessing path based on average reference and deterministic notch filtering
-- tracking preprocessing decisions with deterministic settings and step-level QC logs
-- handling known subject-specific bad channels explicitly through per-participant config
+- preserving task-relevant gamma-band signal rather than cleaning it away aggressively;
+- quantifying frontoparietal theta-gamma PAC as the primary confirmatory measure, with alpha-gamma PAC and P3b as secondary confirmatory measures;
+- using a fully automated, highly complex, and reproducible pre-processing pipeline that incorporates rigorous quality control (QC) checks, EMG sensitivity controls, and deterministic execution to ensure robust outputs;
+- tracking pre-processing decisions with deterministic settings and step-level QC logs;
+- handling known subject-specific bad channels explicitly through per-participant config.
 
 The pipeline is written in Python around MNE-Python and related EEG tooling.
 
-The active preprocessing path is a single shared `1-100 Hz` continuous stream. In practice, that means a shared `1 Hz` high-pass oscillatory path: ASR and ICA both run directly on the same incoming stream rather than creating internal fit-only copies.
+## Associated Research
+
+This repository operationalises the working-memory account of active cognitive
+fatigue proposed by Mangan and Kourtis:
+
+- Mangan, B. E., & Kourtis, D. (2026). The Missing Link: Bridging Cognitive
+  Fatigue with Working Memory. Journal of Cognitive Neuroscience, 38(4),
+  669-679. https://doi.org/10.1162/JOCN.a.2398
+
+The EEG study uses the WAND active cognitive fatigue induction framework
+described in the Mangan preprint:
+
+- Mangan, B. E., Tomaz, S. A., & Kourtis, D. (2026). The Missing Link:
+  Validating the Working Memory Adaptive Fatigue with N-Back Difficulty
+  Protocol for Active Cognitive Fatigue Induction. PsyArXiv preprint, under
+  review at PLOS ONE. https://doi.org/10.31234/osf.io/h4n2w_v1
+
+The analysis tests whether sustained active cognitive demand changes a primary
+EEG marker, frontoparietal theta-gamma PAC, plus two secondary EEG markers:
+frontoparietal alpha-gamma PAC and P3b amplitude/latency.
+
+The main active pre-processing path is a single shared `1-100 Hz` continuous stream. In practice, that means a shared `1 Hz` high-pass oscillatory path: ASR and ICA both run directly on the same incoming stream rather than creating internal fit-only copies.
 
 A separate `0.1-100 Hz` ERP branch also exists, but only for conservative P3b estimation. That branch does not feed ASR, ICA, PAC, alpha-gamma PAC, or the main oscillatory outputs.
 
 ## Why This Repo Exists
 
-EEG preprocessing choices can materially alter downstream findings. Different referencing methods, artifact rejection thresholds, and decomposition-based cleaning steps introduce analytical variability that is rarely reported but can change effect sizes, signs, and statistical conclusions.
+EEG pre-processing choices can materially alter downstream findings. Different referencing methods, artefact rejection thresholds, and decomposition-based cleaning steps introduce analytical variability that is rarely reported but can change effect sizes, signs, and statistical conclusions. Crucially, prior investigations demonstrated that automated decomposition algorithms (e.g., DSS) caused eigen decomposition steps to ramify, drastically altering the final outputs. Therefore, this repository was designed with deterministic execution as a foundational principle.
 
-High-frequency EEG measures are especially vulnerable. Gamma-band activity overlaps spectrally with scalp muscle (EMG) contamination, and aggressive automated cleaning risks removing genuine neural signal alongside artifact. Most published EEG pipelines do not explicitly control for this.
+High-frequency EEG measures are especially vulnerable. Gamma-band activity overlaps spectrally with scalp muscle (EMG) contamination, and aggressive automated cleaning risks removing genuine neural signal alongside artefact. Most published EEG pipelines do not explicitly control for this.
 
 This pipeline addresses these problems in three ways:
 
-1. **Deterministic execution.** Fixed random seeds, single-threaded BLAS/LAPACK, locked dependency versions, and per-step QC logging ensure that results are reproducible on the same hardware and across architectures. The simplified preprocessing path (average reference + FIR notch filter) was chosen specifically because it avoids eigendecomposition-dependent steps that we found to be the primary source of cross-host numerical divergence.
+1. **Deterministic execution.** Fixed random seeds, single-threaded BLAS/LAPACK, locked dependency versions, and per-step QC logging ensure that results are reproducible on the same hardware and across architectures. The default pre-processing path (average reference and FIR notch filter) was chosen specifically because it avoids eigen decomposition-dependent steps that we found to be the primary source of cross-host numerical divergence, ramifying through to final outputs.
 
-2. **Explicit EMG control.** Rather than assuming gamma-band activity is neural, the pipeline includes dedicated EMG channels, PCA-based muscle covariates, and a regression-based exclusion criterion. Blocks where EMG explains more than 25% of gamma variance are flagged for exclusion.
+2. **Explicit EMG control.** Rather than assuming gamma-band activity is neural, the pipeline includes dedicated EMG channels, PCA-based muscle covariates, and regression-based sensitivity checks. Importantly, we do not look at gamma specifically itself; all the gamma is implicitly included in how the amplitude corresponds with the phase of theta. The EMG controls evaluate a corrected PAC and a delta regression against the PC1. EMG outputs serve as diagnostic controls and do not automatically exclude confirmatory PAC blocks.
 
-3. **Documented parameter choices.** All major parameters are centralised in config files with written rationale ([PARAMETERS.md](PARAMETERS.md)), separating confirmatory analyses (H1 theta-gamma PAC, H2 alpha-gamma PAC, H3 P3b) from QC and EMG sensitivity checks.
+3. **Documented parameter choices.** All major parameters are centralised in config files with written rationale ([PARAMETERS.md](PARAMETERS.md)), separating the primary confirmatory analysis (H1 theta-gamma PAC), secondary confirmatory analyses (H2 alpha-gamma PAC, H3 P3b), QC, and EMG sensitivity checks.
 
-The goal here is not just another EEG pipeline, but a more auditable, reproducible workflow where preprocessing decisions are visible and their consequences can be evaluated.
+The goal is an auditable, reproducible EEG workflow where pre-processing decisions are visible and their consequences can be evaluated.
 
 ## Current Scope
 
 The main CLI runner currently automates:
 
-- preprocessing steps 01–07
-- core postprocessing steps 08, 09, 10, and 11
+- pre-processing steps 01-07
+- core post-processing steps 08, 09, 10, and 11
+- integrated QC workflows for PAC phase-band support and P3b visual checks
 
-Additional postprocessing scripts exist for QC aggregation and EMG/PAC sensitivity, but they are not currently part of `python eeg_pipeline/run_pipeline.py --mode full`.
+Additional post-processing scripts exist for EMG/PAC sensitivity, but they are not currently part of `python eeg_pipeline/run_pipeline.py --mode full`.
 
-For PAC, `--mode full` is therefore not the final inclusion workflow by itself. Final high-frequency inclusion or exclusion decisions should only be made after running the EMG follow-up in order: `13_emg_pca_covariates.py`, `08b_pac_emg_corrected.py`, then `14_emg_pac_correlation.py`.
+Run QC only with:
+
+```bash
+python eeg_pipeline/run_pipeline.py --mode qc
+```
+
+The full pipeline runs QC after the main analysis steps.
+
+For PAC, `--mode full` produces the primary confirmatory outputs without automatically filtering PAC rows by an EMG threshold. Run `13_emg_pca_covariates.py`, then `08b_pac_emg_corrected.py` / `09b_alpha_gamma_pac_emg_corrected.py`, then `14_emg_pac_correlation.py` / `15_emg_alpha_gamma_correlation.py` separately when you want the EMG sensitivity diagnostics.
 
 ### Confirmatory vs. Ancillary Analyses
 
 | Type | Steps | Measures |
 |:-----|:------|:---------|
-| **Confirmatory** | 08, 09, 10 | Fixed 4–8 Hz theta–gamma PAC, 8-13 Hz alpha-gamma PAC, P3b mean amplitude and fractional area latency (Luck, 2014) |
-| **Quality control** | 12 | Preprocessing QC summary |
-| **EMG sensitivity** | 08b, 13, 14 | EMG covariates, EMG-corrected PAC, group-level EMG–PAC delta correlation |
+| **Primary confirmatory** | 08 | Fixed 4-8 Hz theta-gamma PAC |
+| **Secondary confirmatory** | 09, 10 | Fixed 8-13 Hz alpha-gamma PAC, P3b mean amplitude and fractional area latency (Luck, 2014) |
+| **Quality control** | `qc/`, 12 | PAC phase-band spectral support QC, P3b visual QC dashboards, pre-processing QC summary |
+| **EMG sensitivity** | 08b, 09b, 13, 14, 15 | EMG covariates, theta-gamma and alpha-gamma EMG-corrected PAC, group-level EMG-PAC delta correlations |
 
 P3b in step 10 is estimated from the dedicated `p3b_erp` branch (`0.1 Hz` high-pass). P3b latency uses 50% fractional area latency rather than argmax peak detection. The `0.1 Hz` high-pass preserves ERP amplitude fidelity but also admits slow positive drift, which can pull argmax toward the window edge rather than the true P3b peak. Fractional area latency (the timepoint at which 50% of the cumulative positive area in the P3b window has been reached) is robust to this drift and is recommended over argmax for ERP latency estimation (Luck, 2014). Theta-gamma PAC, alpha-gamma PAC, and the shared oscillatory outputs stay on the main `1 Hz` path.
 
@@ -74,11 +109,11 @@ Method hierarchy:
 
 ### Cross-Host Reproducibility
 
-During pipeline validation, we tested reproducibility across multiple GCP VM instances (AMD EPYC and Intel architectures). The preprocessing path (average reference + FIR notch filter) avoids eigendecomposition-dependent steps, which we found to be the primary source of cross-host numerical divergence in EEG pipelines.
+During pipeline validation, we tested reproducibility across multiple GCP VM instances (AMD EPYC and Intel architectures). The pre-processing path (average reference and FIR notch filter) avoids eigen decomposition-dependent steps, which we found to be the primary source of cross-host numerical divergence in EEG pipelines.
 
 **Internal validation results:**
-- Same host, repeated runs → byte-identical results
-- Cross-architecture (AMD vs Intel) → consistent effect directions and near-identical outputs for matched inputs
+- Same host, repeated runs -> byte-identical results
+- Cross-architecture (AMD vs Intel) -> consistent effect directions and near-identical outputs for matched inputs
 
 ## Repository Layout
 
@@ -103,11 +138,17 @@ EEG_study_2/
       08_pac_nodal.py
       08b_pac_emg_corrected.py
       09_alpha_gamma_pac.py
+      09b_alpha_gamma_pac_emg_corrected.py
       10_erp_p3b.py
       11_merge_features.py
       12_preprocessing_qc_summary.py
       13_emg_pca_covariates.py
       14_emg_pac_correlation.py
+      15_emg_alpha_gamma_correlation.py
+    qc/
+      pac_phase/
+      p3b/
+      combined/
     src/
   PARAMETERS.md
   requirements.txt
@@ -129,39 +170,46 @@ EEG_study_2/
 | 01 | `01_import_qc.py` | import, channel typing, shared `1-100 Hz` oscillatory bandpass plus separate `0.1-100 Hz` ERP-branch filtering, initial QC |
 | 02 | `02_simple_reference.py` | average re-reference for both the shared oscillatory path and the dedicated ERP branch |
 | 03 | `03_notch_filter.py` | FIR notch filter at 50 Hz for both branches |
-| 04 | `04_asr.py` | Artifact Subspace Reconstruction on the shared `1 Hz` high-pass stream (cutoff = 30 SD) |
-| 05 | `05_ica_iclabel.py` | Extended Infomax ICA plus ICLabel-based artifact classification on that same shared `1 Hz` high-pass stream |
-| 06 | `06_epoch.py` | create main-path `p3b` and `pac` epochs plus separate ERP-branch `p3b_erp` epochs |
-| 07 | `07_autoreject.py` | epoch-level repair and rejection for `p3b`, `p3b_erp`, and `pac` epoch sets |
-| 08 | `08_pac_nodal.py` | theta–gamma phase-amplitude coupling (H1) |
+| 04 | `04_asr.py` | Artefact Subspace Reconstruction on the shared `1 Hz` high-pass stream (cutoff = 30 SD) |
+| 05 | `05_ica_iclabel.py` | Extended Infomax ICA plus ICLabel-based artefact classification on that same shared `1 Hz` high-pass stream |
+| 06 | `06_epoch.py` | create main-path `pac` epochs plus dedicated ERP-branch `p3b_erp` epochs |
+| 07 | `07_autoreject.py` | epoch-level repair and rejection for `p3b_erp` and `pac` epoch sets |
+| 08 | `08_pac_nodal.py` | theta-gamma phase-amplitude coupling (H1) |
 | 08b | `08b_pac_emg_corrected.py` | PAC recomputed after regressing EMG PC1 out of parietal gamma signal at each time point (sensitivity check) |
-| 09 | `09_alpha_gamma_pac.py` | alpha–gamma phase-amplitude coupling (H2) |
+| 09 | `09_alpha_gamma_pac.py` | alpha-gamma phase-amplitude coupling (H2) |
+| 09b | `09b_alpha_gamma_pac_emg_corrected.py` | alpha-gamma PAC recomputed after regressing EMG PC1 out of parietal gamma signal at each time point (H2 sensitivity check) |
 | 10 | `10_erp_p3b.py` | P3b mean amplitude and fractional area latency (50%) from the dedicated `p3b_erp` branch (H3) |
 | 11 | `11_merge_features.py` | merge core feature tables |
-| 12 | `12_preprocessing_qc_summary.py` | Preprocessing QC summary |
-| 13 | `13_emg_pca_covariates.py` | PCA-based EMG covariates from temporalis bipolar (F7−FT7, F8−FT8) and posterior neck monopolar (TP7, TP8) channels |
+| QC | `qc/pac_phase/run_pac_phase_qc.py` | QC-only theta/alpha frontal phase-band spectral support above aperiodic background |
+| QC | `qc/p3b/run_p3b_qc.py` | QC-only participant P3b dashboards using cleaned ERP-branch epochs |
+| QC | `qc/combined/run_qc_summary.py` | Combined QC index across PAC phase and P3b checks |
+| 12 | `12_preprocessing_qc_summary.py` | Pre-processing QC summary |
+| 13 | `13_emg_pca_covariates.py` | PCA-based EMG covariates from temporalis bipolar (F7-FT7, F8-FT8) and posterior neck monopolar (TP7, TP8) channels |
 | 14 | `14_emg_pac_correlation.py` | group-level delta-EMG vs delta-PAC correlation to test whether PAC fatigue effect is driven by EMG changes |
+| 15 | `15_emg_alpha_gamma_correlation.py` | group-level delta-EMG vs alpha-gamma delta-PAC correlation |
 
 ### Ancillary scripts not run by `--mode full`
 
 - `12_preprocessing_qc_summary.py`
 - `13_emg_pca_covariates.py`
 - `08b_pac_emg_corrected.py`
+- `09b_alpha_gamma_pac_emg_corrected.py`
 - `14_emg_pac_correlation.py`
+- `15_emg_alpha_gamma_correlation.py`
 
-Steps 13, 08b, and 14 remain part of the EMG sensitivity workflow even though they are not launched by `--mode full`. Step 13 must be run before 08b and 14 because it creates the EMG covariate files used by both follow-up analyses.
+Steps 13, 08b, 09b, 14, and 15 remain part of the EMG sensitivity workflow even though they are not launched by `--mode full`. Step 13 must be run first because it creates the EMG covariate files used by the follow-up analyses.
 
-### EMG sensitivity analysis (steps 08b, 14)
+### EMG sensitivity analysis (steps 08b, 09b, 14, 15)
 
-Because gamma-band activity overlaps spectrally with scalp muscle (EMG) contamination, the pipeline includes a two-stage EMG sensitivity workflow to verify that PAC findings are not driven by myogenic artifact:
+Because gamma-band activity overlaps spectrally with scalp muscle (EMG) contamination, the pipeline includes layered EMG checks rather than treating any single procedure as a complete separation of neural gamma from muscle artefact:
 
-1. **Step 08b — EMG-corrected PAC.** Regresses EMG PC1 out of the parietal signal at every time point across trials, then recomputes PAC from the corrected signal using the same method as step 08 (trial-concatenated MI, 500 circular-shift surrogates, seed = 42). If the corrected PAC values are highly correlated with uncorrected values, the theta–gamma coupling effect survives EMG removal.
+1. **Steps 08b and 09b: EMG-corrected PAC.** Regress EMG PC1 out of the parietal signal at every time point across trials, then recompute PAC from the corrected signal using the same method as the corresponding primary analysis: step 08 for theta-gamma and step 09 for alpha-gamma.
 
-2. **Step 14 — Group-level delta correlation.** Correlates participant-level change in EMG variance (B5 − B1) with change in PAC z-score (B5 − B1). If the correlation is weak, the PAC fatigue effect is not driven by participants changing their muscle tension between blocks.
+2. **Steps 14 and 15: Group-level delta correlation.** Correlate participant-level change in EMG variance (B5 - B1) with change in theta-gamma PAC z-score and alpha-gamma PAC z-score respectively. A weak correlation is treated as diagnostic support against a simple EMG-change explanation, not as definitive separation of neural gamma from muscle activity.
 
-The primary PAC result (step 08) is reported as the main finding. Steps 08b and 14 are reported as a sensitivity analysis confirming that the PAC effect is not attributable to myogenic contamination.
+The H1 PAC result (step 08) is the primary confirmatory finding, while H2 alpha-gamma PAC (step 09) is secondary. Steps 08b, 09b, 14, and 15 are reported as sensitivity analyses that test whether the PAC effects track myogenic contamination.
 
-The time-point regression in step 08b is intentionally conservative: it removes any trial-wise parietal variance linearly associated with EMG, not only proven muscle artifact. This makes it a robust upper-bound test — if PAC survives this aggressive correction, the theta–gamma coupling effect cannot be attributed to peripheral EMG.
+The time-point regression in steps 08b and 09b is intentionally conservative: it removes any trial-wise parietal variance linearly associated with EMG, not only proven muscle artefact. If the PAC pattern is similar after this correction, that provides sensitivity evidence against a simple peripheral-EMG explanation.
 
 ## Parameters and Method Rationale
 
@@ -177,7 +225,7 @@ That file is the right place to answer:
 
 Current parameter surface:
 
-- `eeg_pipeline/config/parameters.json`: main preprocessing and many analysis parameters
+- `eeg_pipeline/config/parameters.json`: main pre-processing and many analysis parameters
 - `eeg_pipeline/config/study.yml`: study-level paths, block structure, montage, and node definitions
 - `eeg_pipeline/config/participant_configs/*.json` (user-created, not shipped): optional per-subject overrides such as known bad channels. Each study creates its own.
 - selected script-level constants in analysis scripts: still part of the live method until consolidated
@@ -212,7 +260,7 @@ Core libraries used by the active pipeline include `mne`, `asrpy`, `autoreject`,
 
 ## Running The Pipeline
 
-Run the full automated path, which covers preprocessing steps 01-07 and core postprocessing steps 08-11:
+Run the full automated path, which covers pre-processing steps 01-07 and core post-processing steps 08-11:
 
 ```bash
 python eeg_pipeline/run_pipeline.py --mode full
@@ -229,10 +277,12 @@ Run the EMG sensitivity workflow after the core PAC outputs exist:
 ```bash
 python eeg_pipeline/postprocessing/13_emg_pca_covariates.py
 python eeg_pipeline/postprocessing/08b_pac_emg_corrected.py
+python eeg_pipeline/postprocessing/09b_alpha_gamma_pac_emg_corrected.py
 python eeg_pipeline/postprocessing/14_emg_pac_correlation.py
+python eeg_pipeline/postprocessing/15_emg_alpha_gamma_correlation.py
 ```
 
-All pipeline and postprocessing scripts support `--help`. Scripts that operate on subject-level data also support `--subject`.
+All pipeline and post-processing scripts support `--help`. Scripts that operate on subject-level data also support `--subject`.
 
 ## Outputs
 

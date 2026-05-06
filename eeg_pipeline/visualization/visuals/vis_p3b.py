@@ -1,5 +1,5 @@
 """
-Publication-quality P3b ERP visualization (Nature Human Behaviour style).
+P3b ERP visualization.
 
 Single-panel ERP waveform: Block 1 vs Block 5 with P3b window and SEM.
 
@@ -41,11 +41,11 @@ FIG_DIR = PIPELINE_DIR / "outputs" / "publication_figures"
 FIG_DIR.mkdir(parents=True, exist_ok=True)
 FEATURES_DIR = PIPELINE_DIR / "outputs" / "features"
 
-# --- Design constants (Nature Human Behaviour palette) ---
-COLOR_B1 = "#2166AC"        # Refined blue
-COLOR_B5 = "#B2182B"        # Refined red
-COLOR_B1_FILL = "#D1E5F0"   # Light blue ribbon
-COLOR_B5_FILL = "#FDDBC7"   # Light red ribbon
+# --- Plot style constants ---
+COLOR_B1 = "#2166AC"        # Blue
+COLOR_B5 = "#B2182B"        # Red
+COLOR_B1_FILL = "#D1E5F0"   # Block 1 SEM ribbon
+COLOR_B5_FILL = "#FDDBC7"   # Block 5 SEM ribbon
 COLOR_P3B_WIN = "#C8E6C9"   # Soft green P3b highlight
 COLOR_GRID = "#E0E0E0"
 COLOR_TEXT = "#212121"
@@ -59,7 +59,7 @@ P3B_CLUSTER = ["Pz", "P1", "P2", "POz"]  # centroparietal cluster from parameter
 
 
 def _setup_style():
-    """Set Nature Human Behaviour-quality matplotlib defaults."""
+    """Set matplotlib defaults for compact ERP figures."""
     plt.rcParams.update({
         "font.family": "sans-serif",
         "font.sans-serif": ["Helvetica", "Arial", "DejaVu Sans"],
@@ -228,7 +228,7 @@ def plot_subject(subj: str) -> Path | None:
     for spine in ax.spines.values():
         spine.set_color(COLOR_SUBTEXT)
 
-    # Title — left-aligned, NHB style
+    # Left-aligned title
     ax.set_title(
         f"P3b Event-Related Potential — {subj}",
         loc="left", fontsize=11, fontweight="bold", color=COLOR_TEXT, pad=10,
@@ -334,7 +334,7 @@ def plot_group(exclude=None):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Publication P3b ERP visualization (NHB style).",
+        description="P3b ERP visualization.",
     )
     parser.add_argument("--subject", type=str, nargs="+", default=None,
                         help="One or more subjects (e.g. sub-p006 sub-p003)")

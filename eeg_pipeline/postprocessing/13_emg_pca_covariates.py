@@ -1,10 +1,10 @@
 # eeg_pipeline/postprocessing/13_emg_pca_covariates.py
 """
-EMG PCA covariates for gamma contamination control.
+EMG PCA covariates for gamma-contamination sensitivity checks.
 
-Uses the actual dedicated off-cap EMG sensors to construct a single robust
-'Global Muscle Tension' covariate (PC1) to control for jaw clenching and
-neck stiffening without over-cleaning the neural data.
+Constructs one EMG PC1 covariate from the dedicated off-cap EMG sensors.
+The covariate summarizes temporalis and posterior-neck activity for use in
+EMG sensitivity analyses.
 
 Target EMG Sensors (from montage_channel_plan.md):
   Temporalis (BIPOLAR, 2 per side):
@@ -26,6 +26,12 @@ import os
 import sys
 import argparse
 from pathlib import Path
+
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MNE_DONTWRITE_HOME"] = "true"
+os.environ.setdefault("_MNE_FAKE_HOME_DIR", os.path.dirname(os.path.dirname(__file__)))
 
 import mne
 import numpy as np
@@ -218,7 +224,7 @@ def main():
     subjects = discover_subjects(
         epochs_dir=epochs_dir,
         blocks=blocks,
-        epoch_type="p3b",
+        epoch_type="pac",
         require_all_blocks=False,
     )
     if not subjects:

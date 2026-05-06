@@ -1,17 +1,13 @@
-# eeg_pipeline/analysis/13_pac_nodal.py
+# eeg_pipeline/postprocessing/08_pac_nodal.py
 """
-Step 4 -- Phase-Amplitude Coupling Analysis
+Step 08 - Theta-gamma phase-amplitude coupling.
 
 Between-region PAC — direct frontal→parietal coupling
     Primary (locked): C_broad_F → C_broad_P
-    Descriptive 9-node delta-PAC heatmap data (all-pairs)
-
 Modulation Index (Tort et al., 2010) with surrogate z-scoring.
 Uses FIR filtering, trial concatenation, and 500 surrogates.
 Analysis window: 0-0.6 s stimulus-locked.
 Outputs long format: one row per subject x block.
-
-Reference: post_processing_EEG_plan_v2.docx, Step 4
 """
 import sys
 import os
@@ -43,8 +39,8 @@ from src.utils_features import (
     filter_excluded_channels,
 )
 
-# Tensorpac REMOVED — trial-concatenation is the sole PAC method.
-# This ensures fully deterministic Z-scores with RandomState(42).
+# Tensorpac is not used; trial-concatenation is the sole PAC method.
+# RandomState(42) is used for deterministic surrogate z-scores.
 
 OUTPUT_DIR = pipeline_dir / "outputs" / "features"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -59,7 +55,7 @@ _STAT_BOX = dict(boxstyle='round,pad=0.4', facecolor='#ECEFF1', edgecolor='#B0BE
 
 
 def _style_ax(ax):
-    """Apply publication style: remove top/right spines, light grid."""
+    """Apply the standard plot style: remove top/right spines, light grid."""
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
     ax.grid(True, alpha=0.3)
@@ -132,7 +128,7 @@ def _draw_convex_hull(ax, points, color, alpha=0.3, label=None):
     return (0, 0)
 
 def _plot_pac_layout_A(subj, block_details):
-    """Layout A: Publication-quality Scalp Montage — B1 | B5 | Delta."""
+    """Layout A: scalp montage for B1, B5, and delta PAC."""
     sorted_blocks = sorted(block_details.keys())
     if len(sorted_blocks) < 2:
         return
@@ -478,7 +474,7 @@ def _gamma_amp(signal_1d, sfreq, lo, hi):
     return np.abs(sp_hilbert(filt))
 
 
-# compute_pac_tensorpac REMOVED — see _pac_from_precomputed() for sole PAC path.
+# Tensorpac implementation is intentionally absent; see _pac_from_precomputed().
 
 
 def compute_pac_trial_concat(phase_signal, amp_signal, sfreq, cfg):
@@ -663,8 +659,8 @@ def _modulation_index(theta_phase, gamma_amp, n_bins=12, return_details=False):
     return mi
 
 
-# compute_pac dispatcher REMOVED — _pac_from_precomputed() is the sole PAC path.
-# No tensorpac dependency and no alternate PAC path. Fully deterministic.
+# _pac_from_precomputed() is the sole PAC path.
+# No tensorpac dependency or alternate PAC implementation is used.
 
 def main():
     parser = argparse.ArgumentParser(description='PAC analysis')
@@ -811,6 +807,11 @@ def main():
     if between_rows:
         df_between = pd.DataFrame(between_rows)
         out_between = _tag_path("pac_between_features.csv", OUTPUT_DIR)
+        new_subjects = df_between["subject"].unique()
+        if Path(out_between).exists():
+            df_existing = pd.read_csv(out_between)
+            df_existing = df_existing[~df_existing["subject"].isin(new_subjects)]
+            df_between = pd.concat([df_existing, df_between], ignore_index=True)
         df_between.to_csv(out_between, index=False)
         print(f"\nSaved theta-gamma PAC to {out_between}")
         print(df_between.to_string(index=False))

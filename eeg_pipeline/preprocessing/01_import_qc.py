@@ -43,15 +43,15 @@ def save_qc_figures(raw: mne.io.BaseRaw, out_dir: Path, subj: str) -> None:
     fig_psd.savefig(out_dir / f"{subj}_psd.png", dpi=160)
     plt.close(fig_psd)
 
-    # 2. Trace panel (Corrected)
-    # Note: We create the plot, THEN resize it using matplotlib commands
+    # 2. Trace panel
+    # Create the plot, then resize it using matplotlib commands.
     fig_tr = raw.plot(
         n_channels=len(raw.ch_names),  # Show ALL channels
         duration=10.0,
         scalings=dict(eeg=20e-6, eog=200e-6, emg=100e-6),
         show=False
     )
-    # FIX: Use set_size_inches to make it tall enough for 64 channels
+    # Make the figure tall enough for 64 channels.
     fig_tr.set_size_inches(12, 20)
 
     fig_tr.savefig(out_dir / f"{subj}_traces.png", dpi=160)
@@ -103,10 +103,9 @@ def main():
         # 3a) Load raw
         raw = read_raw(p, cfg["data"]["format"], cfg["montage"])
 
-        # --- CRITICAL FIX FOR EMG CHANNELS ---
-        # We must tell MNE which channels are NOT brain channels.
-        # Otherwise, they get flagged as "Bad EEG" and deleted, or worse,
-        # they contaminate the robust average reference.
+        # --- EMG channel typing ---
+        # Mark non-brain channels before bad-channel detection and reference.
+        # This prevents EMG channels from being handled as EEG channels.
         aux_map = {}
 
         # CNT files use non-standard names for some channels.

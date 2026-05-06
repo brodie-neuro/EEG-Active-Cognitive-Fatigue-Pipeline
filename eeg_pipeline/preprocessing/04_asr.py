@@ -48,7 +48,7 @@ try:
 except ImportError:
     raise ImportError("FAILED: asrpy not available. Install with: pip install asrpy")
 
-# ─── (A) threadpoolctl as belt-and-suspenders safeguard ───
+# ─── (A) threadpoolctl runtime guard ───
 try:
     from threadpoolctl import threadpool_limits
     THREADPOOLCTL_AVAILABLE = True

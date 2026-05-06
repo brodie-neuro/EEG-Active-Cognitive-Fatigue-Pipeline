@@ -109,6 +109,123 @@
         "n_surrogates": 500,
         "trim": 0.1
     },
+    "alpha_gamma_pac": {
+        "_doc": "H2 alpha-gamma PAC and its EMG sensitivity counterpart. Same MI/surrogate method and frontoparietal topology as theta-gamma PAC, with frontal alpha phase instead of frontal theta phase.",
+        "phase_node": "C_broad_F",
+        "amp_node": "C_broad_P",
+        "phase_band": [
+            8,
+            13
+        ],
+        "amp_band": [
+            55,
+            85
+        ],
+        "analysis_window": [
+            0.0,
+            0.6
+        ],
+        "n_surrogates": 500,
+        "n_bins": 12,
+        "random_seed": 42,
+        "analysis_excluded_subjects": [
+            "sub-p005",
+            "sub-p011"
+        ],
+        "_doc_analysis_excluded_subjects": "Study-specific QC-based H2 alpha-gamma PAC exclusions for the current dataset. For a new dataset, clear or replace these subject IDs after reviewing that dataset's QC outputs. Raw feature extraction can still compute all participants, but H2 inference and alpha-gamma EMG sensitivity outputs should drop listed subjects."
+    },
+    "pac_phase_qc": {
+        "enabled": true,
+        "_doc": "QC-only spectral support check for the frontal phase bands used in theta-gamma and alpha-gamma PAC. Uses cleaned PAC epochs, the PAC analysis window, and residual spectra after aperiodic removal.",
+        "phase_node": "C_broad_F",
+        "fallback_phase_channels": [
+            "Fz",
+            "FCz",
+            "F3",
+            "F4",
+            "FC1",
+            "FC2",
+            "FC3",
+            "FC4"
+        ],
+        "bands": {
+            "theta": [
+                4.0,
+                8.0
+            ],
+            "alpha": [
+                8.0,
+                13.0
+            ]
+        },
+        "optional_bands": {},
+        "analysis_window": [
+            0.0,
+            0.6
+        ],
+        "psd": {
+            "method": "welch",
+            "fmin": 1.0,
+            "fmax": 40.0,
+            "nperseg_seconds": 2.0,
+            "noverlap_fraction": 0.5,
+            "window": "hann",
+            "detrend": "constant"
+        },
+        "aperiodic": {
+            "method": "specparam_if_available",
+            "fit_range": [
+                2.0,
+                40.0
+            ],
+            "exclude_ranges": [
+                [
+                    48.0,
+                    52.0
+                ]
+            ],
+            "exclude_target_bands_in_fallback": true,
+            "robust_iterations": 4,
+            "robust_positive_residual_z": 2.5,
+            "specparam_max_n_peaks": 6,
+            "specparam_peak_width_limits": [
+                1.0,
+                12.0
+            ]
+        },
+        "classification": {
+            "weak_min_positive_fraction": 0.2,
+            "clear_min_positive_fraction": 0.35,
+            "weak_min_positive_area": 0.01,
+            "clear_min_positive_area": 0.025,
+            "weak_min_peak_noise_z": 0.75,
+            "clear_min_peak_noise_z": 1.25,
+            "noise_floor": 1e-06
+        },
+        "plots": {
+            "xlim": [
+                1.0,
+                30.0
+            ]
+        }
+    },
+    "p3b_qc": {
+        "enabled": true,
+        "_doc": "QC-only visual and numeric checks for the configured P3b ERP branch, ROI, and measurement window.",
+        "plot_window": [
+            -0.2,
+            0.8
+        ],
+        "baseline_window": [
+            -0.2,
+            0.0
+        ],
+        "classification": {
+            "clear_min_mean_uV": 0.5,
+            "weak_min_mean_uV": 0.0,
+            "review_if_missing_roi_channel": true
+        }
+    },
     "qc": {
         "max_bad_channels_pct": 10,
         "max_ica_components_rejected": 8,

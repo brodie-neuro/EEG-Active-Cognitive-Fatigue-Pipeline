@@ -2,10 +2,10 @@
 """
 Step 08b - PAC with EMG-corrected gamma (sensitivity analysis).
 
-Identical to step 08 PAC computation EXCEPT:
+Same PAC computation as step 08, with one sensitivity-control change:
   Before computing gamma amplitude, regress out EMG PC1 from each trial's
   parietal signal at every time point. This removes the trial-level EMG
-  contribution from the gamma envelope BEFORE the Hilbert transform.
+  contribution from the parietal signal before the Hilbert transform.
 
 Method:
   For each time point t across N trials:

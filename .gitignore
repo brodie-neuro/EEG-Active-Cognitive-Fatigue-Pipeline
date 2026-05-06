@@ -183,6 +183,7 @@ projection_*.py
 
 # --- 27. Internal documentation (not for publication) ---
 manuscript_draft*.md
+manuscript draft.txt
 methods_justification.md
 master_comparison_*.md
 
@@ -197,3 +198,18 @@ vm*.yml
 
 # --- 29. Temp data files ---
 *.tar.gz
+.Rproj.user
+
+# --- 29b. Local one-off repair/participant workaround scripts ---
+eeg_pipeline/fix_save_bug.py
+eeg_pipeline/preprocessing/04_asr_p012.py
+
+# --- 30. Local QC review artifacts ---
+P3b_review/
+*.Rhistory
+*.RData
+*.Ruserdata
+
+# --- 31. Local exploratory analyses, not part of public pipeline ---
+exploratory_analysis/
+interesting_analysis/

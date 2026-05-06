@@ -20,6 +20,7 @@ from pathlib import Path
 PIPELINE_DIR = Path(__file__).resolve().parent
 PREPROCESS_DIR = "preprocessing"
 POSTPROCESS_DIR = "postprocessing"
+QC_DIR = "qc"
 
 PREPROCESS = [
     ("01 Import + QC", f"{PREPROCESS_DIR}/01_import_qc.py"),
@@ -36,6 +37,12 @@ ANALYSIS = [
     ("09 Alpha Gamma PAC", f"{POSTPROCESS_DIR}/09_alpha_gamma_pac.py"),
     ("10 ERP P3b", f"{POSTPROCESS_DIR}/10_erp_p3b.py"),
     ("11 Merge Features", f"{POSTPROCESS_DIR}/11_merge_features.py"),
+]
+
+QC = [
+    ("QC PAC Phase", f"{QC_DIR}/pac_phase/run_pac_phase_qc.py"),
+    ("QC P3b", f"{QC_DIR}/p3b/run_p3b_qc.py"),
+    ("QC Combined Summary", f"{QC_DIR}/combined/run_qc_summary.py"),
 ]
 
 DETERMINISM_ENV = {
@@ -121,7 +128,7 @@ def run_step(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run EEG preprocessing/analysis pipeline.")
-    parser.add_argument("--mode", choices=["full", "preprocess", "analysis"], default="full")
+    parser.add_argument("--mode", choices=["full", "preprocess", "analysis", "qc"], default="full")
     parser.add_argument("--subject", default="", help="Optional subject filter for subject-aware steps.")
     parser.add_argument("--adapter", default="", help="Optional adapter JSON path.")
     parser.add_argument("--continue-on-error", action="store_true", help="Continue running after failed steps.")
@@ -165,12 +172,15 @@ def main() -> None:
     available_steps: list[tuple[str, str, bool]] = (
         [(name, path, True) for name, path in PREPROCESS]
         + [(name, path, False) for name, path in ANALYSIS]
+        + [(name, path, True) for name, path in QC]
     )
     all_steps: list[tuple[str, str, bool]] = []
     if args.mode in {"full", "preprocess"}:
         all_steps.extend([(name, path, True) for name, path in PREPROCESS])
     if args.mode in {"full", "analysis"}:
         all_steps.extend([(name, path, False) for name, path in ANALYSIS])
+    if args.mode in {"full", "qc"}:
+        all_steps.extend([(name, path, True) for name, path in QC])
 
     if args.repeat_count and not args.repeat_step:
         raise SystemExit("--repeat-count requires --repeat-step.")

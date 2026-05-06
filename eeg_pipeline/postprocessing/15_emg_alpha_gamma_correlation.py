@@ -1,10 +1,10 @@
-# eeg_pipeline/postprocessing/14_emg_pac_correlation.py
+# eeg_pipeline/postprocessing/15_emg_alpha_gamma_correlation.py
 """
-Step 14: Group-level EMG-PAC sensitivity check.
+Step 15: Group-level alpha-gamma EMG-PAC sensitivity check.
 
 Correlates delta-EMG (B5-B1 EMG PC1 variance) with delta-PAC (B5-B1 PAC z)
-across participants. This is a diagnostic check for whether PAC change is
-associated with EMG change.
+across participants. This is a diagnostic check for whether alpha-gamma PAC
+change is associated with EMG change.
 
 Also correlates within-block EMG variance with PAC z-score.
 """
@@ -26,11 +26,18 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
+from src.utils_config import get_param
 from src.utils_io import parse_subject_filter, subject_matches
 
 OUTPUT_DIR = pipeline_dir / "outputs" / "features"
 FIG_DIR = pipeline_dir / "outputs" / "analysis_figures"
 FIG_DIR.mkdir(parents=True, exist_ok=True)
+
+PRIMARY_VARIANTS = {"frontal_alpha_to_parietal_gamma", "frontal_alpha->parietal_gamma"}
+ALPHA_GAMMA_CFG = get_param("alpha_gamma_pac", default={}) or {}
+H2_EXCLUDED_SUBJECTS = {
+    str(subj) for subj in ALPHA_GAMMA_CFG.get("analysis_excluded_subjects", [])
+}
 
 
 def _corr_pair(x, y):
@@ -48,7 +55,7 @@ def _corr_pair(x, y):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Group-level EMG-PAC sensitivity check.")
+    parser = argparse.ArgumentParser(description="Group-level alpha-gamma EMG-PAC sensitivity check.")
     parser.add_argument(
         "--subject",
         default=os.environ.get("EEG_SUBJECT_FILTER", ""),
@@ -64,16 +71,16 @@ def main():
     emg_df = pd.read_csv(emg_path)
 
     # Load PAC z-scores
-    pac_path = OUTPUT_DIR / "pac_between_features.csv"
+    pac_path = OUTPUT_DIR / "alpha_gamma_pac_features.csv"
     if not pac_path.exists():
-        raise FileNotFoundError(f"{pac_path} not found. Run step 08 first.")
+        raise FileNotFoundError(f"{pac_path} not found. Run step 09 first.")
     pac_df = pd.read_csv(pac_path)
-
-    # Get the PAC column (should be pac_between_C_broad_F_C_broad_P)
-    pac_cols = [c for c in pac_df.columns if c.startswith("pac_between")]
-    if not pac_cols:
-        raise KeyError("No pac_between columns found.")
-    pac_col = pac_cols[0]
+    if "variant" in pac_df.columns:
+        pac_df = pac_df[pac_df["variant"].astype(str).isin(PRIMARY_VARIANTS)].copy()
+        pac_df["variant"] = "frontal_alpha_to_parietal_gamma"
+    if H2_EXCLUDED_SUBJECTS:
+        pac_df = pac_df[~pac_df["subject"].astype(str).isin(H2_EXCLUDED_SUBJECTS)].copy()
+    pac_col = "z_score"
 
     # Merge EMG + PAC
     merged = pd.merge(
@@ -89,8 +96,10 @@ def main():
         ].reset_index(drop=True)
 
     print("=" * 60)
-    print("Step 14: EMG-PAC Group-Level Sensitivity")
+    print("Step 15: Alpha-Gamma EMG-PAC Group-Level Sensitivity")
     print("=" * 60)
+    if H2_EXCLUDED_SUBJECTS:
+        print("H2 alpha-gamma exclusions applied: " + ", ".join(sorted(H2_EXCLUDED_SUBJECTS)))
 
     if merged.empty:
         print("No overlapping EMG and PAC rows found.")
@@ -139,7 +148,7 @@ def main():
     print()
     print(delta_df.to_string(index=False))
     if not np.isfinite(r_delta):
-        out_csv = OUTPUT_DIR / "emg_pac_delta_correlation.csv"
+        out_csv = OUTPUT_DIR / "emg_alpha_gamma_delta_correlation.csv"
         delta_df.to_csv(out_csv, index=False)
         print("\nDelta correlation not estimable because the paired data are constant or incomplete.")
         print(f"  Saved delta table: {out_csv}")
@@ -213,16 +222,16 @@ def main():
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
-    fig.suptitle("EMG-PAC Sensitivity\nDoes EMG change predict PAC change?",
+    fig.suptitle("Alpha-Gamma EMG Sensitivity\nDoes EMG change predict PAC change?",
                  fontsize=14, fontweight="bold")
     fig.tight_layout()
-    out = FIG_DIR / "emg_pac_sensitivity_variantB.png"
+    out = FIG_DIR / "emg_alpha_gamma_sensitivity_variantB.png"
     fig.savefig(out, dpi=200, bbox_inches="tight", facecolor="white")
     plt.close(fig)
     print(f"\n  Saved figure: {out}")
 
     # Save delta table
-    out_csv = OUTPUT_DIR / "emg_pac_delta_correlation.csv"
+    out_csv = OUTPUT_DIR / "emg_alpha_gamma_delta_correlation.csv"
     delta_df.to_csv(out_csv, index=False)
     print(f"  Saved delta table: {out_csv}")
 
