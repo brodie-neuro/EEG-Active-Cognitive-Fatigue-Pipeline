@@ -14,12 +14,10 @@
 
 This repository contains a scripted EEG pre-processing and analysis pipeline for studying active cognitive fatigue. It is designed for 64-channel EEG, with a specific emphasis on:
 
-- preserving task-relevant gamma-band signal rather than cleaning it away aggressively;
-- quantifying frontoparietal theta-gamma PAC as the primary confirmatory measure, with P3b as a secondary ERP measure and alpha-gamma PAC as a secondary theoretically motivated PAC analysis;
-- using a fully automated, highly complex, and reproducible pre-processing pipeline that incorporates rigorous quality control (QC) checks, EMG sensitivity controls, and deterministic execution to ensure robust outputs;
-- tracking pre-processing decisions with deterministic settings and step-level QC logs;
-- handling known subject-specific bad channels explicitly through per-participant config;
-- executing a rigorous Sequential Bayes Factor Design (SBFD) to determine the final sample size based strictly on the primary hypothesis ($N_{min}=20$, $N_{max}=30$, target $BF_{10}>5$).
+- Quantifying frontoparietal theta-gamma PAC as the primary confirmatory measure, with alpha-gamma PAC as a secondary theoretically motivated PAC analysis, and P3b as a secondary ERP measure.
+- Using an end-to-end automated, reproducible pre-processing pipeline that incorporates rigorous quality control (QC) checks and EMG sensitivity controls.
+- Tracking pre-processing decisions with deterministic settings and step-level QC logs.
+- Handling known subject-specific bad channels explicitly through per-participant config.
 
 The pipeline is written in Python around MNE-Python and related EEG tooling.
 
@@ -53,9 +51,9 @@ A separate `0.1-100 Hz` ERP branch also exists, but only for conservative P3b es
 
 ## Why This Repo Exists
 
-EEG pre-processing choices can materially alter downstream findings. Different referencing methods, artefact rejection thresholds, and decomposition-based cleaning steps introduce analytical variability that is rarely reported but can change effect sizes, signs, and statistical conclusions. Crucially, prior investigations demonstrated that automated decomposition algorithms (e.g., DSS) caused eigen decomposition steps to ramify, drastically altering the final outputs. Therefore, this repository was designed with deterministic execution as a foundational principle.
+EEG pre-processing choices can materially alter downstream findings. Different referencing methods, artefact rejection thresholds, and decomposition-based cleaning steps introduce analytical variability that is rarely reported but can alter effect sizes, directionality, and statistical conclusions. Crucially, prior investigations demonstrated that automated decomposition algorithms (e.g., DSS) caused eigen decomposition steps to ramify, drastically altering the final outputs. Therefore, this repository was designed with deterministic execution as a foundational principle.
 
-High-frequency EEG measures are especially vulnerable. Gamma-band activity overlaps spectrally with scalp muscle (EMG) contamination, and aggressive automated cleaning risks removing genuine neural signal alongside artefact. Most published EEG pipelines do not explicitly control for this.
+High-frequency EEG measures are especially vulnerable. Gamma-band activity overlaps spectrally with scalp muscle (EMG) contamination. Overly aggressive or blind artefact rejection risks removing genuine neural signal alongside artefact. Most published EEG pipelines do not explicitly control for this overlap.
 
 This pipeline addresses these problems in three ways:
 
