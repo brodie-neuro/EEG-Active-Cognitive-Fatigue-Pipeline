@@ -9,8 +9,8 @@ Researchers applying this pipeline to a new dataset should create their own excl
 | Analysis | Excluded participants | Applies to | Reason |
 |:--|:--|:--|:--|
 | H1 theta-gamma PAC | none | Primary theta-gamma PAC inference and theta-gamma EMG sensitivity checks | No current participant-level exclusion is applied to H1. |
-| H2 alpha-gamma PAC | `sub-p005`, `sub-p011` | H2 alpha-gamma PAC inference, alpha-gamma EMG-corrected PAC sensitivity, and alpha-gamma EMG/PAC delta correlation | `sub-p005`: frontal alpha phase QC showed weak, fragmented, edge-dominated residual support after aperiodic removal, so fixed 8-13 Hz frontal alpha phase is not treated as interpretable. `sub-p011`: Block 5 alpha-gamma PAC has too few usable trials in the current feature table, so paired H2 inference is not treated as reliable. |
-| H3 P3b | `sub-p005` | Secondary P3b inference | P3b QC showed a large negative-going posterior deflection rather than a plausible P3b response in the configured window. |
+| H2 alpha-gamma PAC | `sub-p005`, `sub-p011` | Secondary H2 alpha-gamma PAC inference, alpha-gamma EMG-corrected PAC sensitivity, and alpha-gamma EMG/PAC delta correlation | `sub-p005`: frontal alpha phase QC showed weak, fragmented, edge-dominated residual support after aperiodic removal, so fixed 8-13 Hz frontal alpha phase is not treated as interpretable. `sub-p011`: Block 5 alpha-gamma PAC has too few usable trials in the current feature table, so paired H2 inference is not treated as reliable. |
+| H3 P3b | `sub-p005`, `sub-p013` | Secondary P3b inference | P3b QC indicated clear non-interpretable/inverted posterior responses in the configured window. Low-amplitude or weak P3b cases, including `sub-p010`, are retained in the primary model and can be examined in stricter QC sensitivity checks. |
 
 ## Implementation Notes
 

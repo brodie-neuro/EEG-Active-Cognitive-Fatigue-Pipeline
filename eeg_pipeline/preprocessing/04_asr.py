@@ -225,6 +225,59 @@ def _run_asr_once(raw, eeg_picks, sfreq, asr_params, use_clean_windows):
     return raw_clean, data_before, data_after, metrics, diag
 
 
+def _is_asrpy_reshape_error(exc: ValueError) -> bool:
+    """Detect the asrpy block_covariance reshape boundary-condition failure."""
+    return "cannot reshape array of size" in str(exc)
+
+
+def _crop_one_sample_for_asr_retry(raw, sfreq) -> dict:
+    """Drop one final sample in-place and return an audit record."""
+    n_times_before = int(raw.n_times)
+    if n_times_before < 2:
+        raise RuntimeError("Cannot crop ASR input below one sample.")
+
+    raw.crop(tmin=0, tmax=(n_times_before - 2) / sfreq)
+    n_times_after = int(raw.n_times)
+    return {
+        "n_times_before": n_times_before,
+        "n_times_after": n_times_after,
+        "samples_removed": n_times_before - n_times_after,
+    }
+
+
+def _run_asr_with_reshape_retry(raw, eeg_picks, sfreq, asr_params, use_clean_windows):
+    """Run ASR, retrying known asrpy reshape failures after one-sample crops."""
+    max_retries = int(asr_params.get("reshape_retry_max_samples", 5))
+    retry_events = []
+
+    for attempt in range(max_retries + 1):
+        try:
+            raw_clean, data_before, data_after, metrics, diag = _run_asr_once(
+                raw, eeg_picks, sfreq, asr_params, use_clean_windows
+            )
+            diag["asrpy_reshape_retry_used"] = bool(retry_events)
+            diag["asrpy_reshape_retry_events"] = retry_events
+            diag["asrpy_reshape_retry_samples_removed"] = sum(
+                event["samples_removed"] for event in retry_events
+            )
+            return raw_clean, data_before, data_after, metrics, diag
+        except ValueError as exc:
+            if not _is_asrpy_reshape_error(exc) or attempt >= max_retries:
+                raise
+
+            crop_event = _crop_one_sample_for_asr_retry(raw, sfreq)
+            crop_event["attempt"] = attempt + 1
+            crop_event["error"] = str(exc)
+            retry_events.append(crop_event)
+            print(
+                "Caught asrpy reshape bug "
+                f"(attempt {attempt + 1}/{max_retries}). "
+                "Cropped 1 sample and retrying..."
+            )
+
+    raise RuntimeError("ASR retry loop exited without returning or raising.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Step 04: ASR cleaning")
     parser.add_argument(
@@ -321,16 +374,16 @@ def main():
         asr_cutoff = asr_params.get('cutoff', 20)
         print(f"Fitting ASR (cutoff={asr_cutoff}, clean_windows={use_clean_windows})...")
 
-        # ─── (A) Wrap in threadpoolctl context ───
-        def _do_asr():
-            return _run_asr_once(raw, eeg_picks, sfreq, asr_params, use_clean_windows)
-
         if THREADPOOLCTL_AVAILABLE:
             with threadpool_limits(limits=1, user_api='blas'):
                 with threadpool_limits(limits=1, user_api='openmp'):
-                    raw_clean, data_before, data_after, metrics, diag = _do_asr()
+                    raw_clean, data_before, data_after, metrics, diag = _run_asr_with_reshape_retry(
+                        raw, eeg_picks, sfreq, asr_params, use_clean_windows
+                    )
         else:
-            raw_clean, data_before, data_after, metrics, diag = _do_asr()
+            raw_clean, data_before, data_after, metrics, diag = _run_asr_with_reshape_retry(
+                raw, eeg_picks, sfreq, asr_params, use_clean_windows
+            )
 
         # ─── (F) Reproducibility test mode ───
         if args.repeat > 0:
@@ -342,11 +395,11 @@ def main():
                 if THREADPOOLCTL_AVAILABLE:
                     with threadpool_limits(limits=1, user_api='blas'):
                         with threadpool_limits(limits=1, user_api='openmp'):
-                            _, _, _, rep_metrics, rep_diag = _run_asr_once(
+                            _, _, _, rep_metrics, rep_diag = _run_asr_with_reshape_retry(
                                 raw, eeg_picks, sfreq, asr_params, use_clean_windows
                             )
                 else:
-                    _, _, _, rep_metrics, rep_diag = _run_asr_once(
+                    _, _, _, rep_metrics, rep_diag = _run_asr_with_reshape_retry(
                         raw, eeg_picks, sfreq, asr_params, use_clean_windows
                     )
                 all_diags.append(rep_diag)
@@ -402,6 +455,11 @@ def main():
         print(f"  M hash: {diag['M_hash']}  T hash: {diag['T_hash']}")
         if 'sample_mask_pct_kept' in diag:
             print(f"  Calibration windows: {diag['sample_mask_pct_kept']:.1f}% kept")
+        if diag.get("asrpy_reshape_retry_used"):
+            print(
+                "  asrpy reshape retry: "
+                f"removed {diag.get('asrpy_reshape_retry_samples_removed', 0)} sample(s)"
+            )
 
         # ─── Save per-subject diagnostic JSON ───
         diag_path = debug_dir / f"{subj}_block{block_num}_asr_diag.json"
@@ -429,6 +487,10 @@ def main():
             'clean_windows': use_clean_windows,
             'n_eeg_channels': len(eeg_picks),
             'n_samples': data_before.shape[1],
+            'asrpy_reshape_retry_used': bool(diag.get('asrpy_reshape_retry_used', False)),
+            'asrpy_reshape_retry_samples_removed': int(
+                diag.get('asrpy_reshape_retry_samples_removed', 0)
+            ),
             'M_hash': diag['M_hash'],
             'T_hash': diag['T_hash'],
             'status': 'PASS' if modified_pct_1e9 <= asr_params.get('max_modification_pct', 30.0) else 'EXCEED_THRESHOLD',
@@ -466,9 +528,9 @@ def main():
             fig, axes = plt.subplots(2, 1, figsize=(12, 6))
 
             ch_idx = raw.ch_names.index('Fz') if 'Fz' in raw.ch_names else 0
-            t = np.arange(data.shape[1]) / sfreq
+            t = np.arange(data_before.shape[1]) / sfreq
 
-            axes[0].plot(t[:int(10*sfreq)], data[ch_idx, :int(10*sfreq)] * 1e6,
+            axes[0].plot(t[:int(10*sfreq)], data_before[ch_idx, :int(10*sfreq)] * 1e6,
                          'b', alpha=0.7, label='Before')
             axes[0].plot(t[:int(10*sfreq)], data_after[ch_idx, :int(10*sfreq)] * 1e6,
                          'r', alpha=0.7, label='After')
@@ -476,7 +538,7 @@ def main():
             axes[0].set_title(f'{subj} - First 10 seconds (Fz)')
             axes[0].legend()
 
-            var_before = np.var(data, axis=1) * 1e12
+            var_before = np.var(data_before, axis=1) * 1e12
             var_after = np.var(data_after, axis=1) * 1e12
             axes[1].bar(range(len(var_before)), var_before, alpha=0.5, label='Before')
             axes[1].bar(range(len(var_after)), var_after, alpha=0.5, label='After')
@@ -496,6 +558,10 @@ def main():
                          'modified_pct_1e15': round(modified_pct, 1),
                          'modified_pct_1e9': round(modified_pct_1e9, 1),
                          'mean_abs_change_uv': round(metrics['mean_abs_change_uv'], 4),
+                         'asrpy_reshape_retry_used': bool(diag.get("asrpy_reshape_retry_used", False)),
+                         'asrpy_reshape_retry_samples_removed': int(
+                             diag.get("asrpy_reshape_retry_samples_removed", 0)
+                         ),
                      },
                      params_used=asr_params)
         qc.save_report()
@@ -522,6 +588,12 @@ def main():
                     "modification_pct": metrics["modified_pct_element_1e9"],
                     "cutoff": asr_params.get("cutoff", 20),
                     "use_clean_windows": bool(use_clean_windows),
+                    "asrpy_reshape_retry_used": bool(
+                        diag.get("asrpy_reshape_retry_used", False)
+                    ),
+                    "asrpy_reshape_retry_samples_removed": int(
+                        diag.get("asrpy_reshape_retry_samples_removed", 0)
+                    ),
                 },
             },
         )

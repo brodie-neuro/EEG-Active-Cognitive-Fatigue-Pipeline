@@ -54,6 +54,8 @@ def compute_welch_psd(
     nperseg = max(16, min(nperseg, signal_1d.size))
     noverlap = int(round(nperseg * float(psd_cfg.get("noverlap_fraction", 0.5))))
     noverlap = max(0, min(noverlap, nperseg - 1))
+    nfft_factor = max(1.0, float(psd_cfg.get("nfft_factor", psd_cfg.get("zero_pad_factor", 1.0))))
+    nfft = max(nperseg, int(round(nperseg * nfft_factor)))
 
     freqs, psd = welch(
         signal_1d,
@@ -61,6 +63,7 @@ def compute_welch_psd(
         window=psd_cfg.get("window", "hann"),
         nperseg=nperseg,
         noverlap=noverlap,
+        nfft=nfft,
         detrend=psd_cfg.get("detrend", "constant"),
         scaling="density",
     )
@@ -74,6 +77,10 @@ def compute_welch_psd(
         "method": "welch",
         "nperseg": int(nperseg),
         "noverlap": int(noverlap),
+        "nfft": int(nfft),
+        "nfft_factor": float(nfft_factor),
+        "true_resolution_hz": float(sfreq / nperseg),
+        "bin_spacing_hz": float(sfreq / nfft),
         "fmin": fmin,
         "fmax": fmax,
     }
@@ -97,54 +104,12 @@ def _mad(values: np.ndarray) -> float:
     return mad
 
 
-def _fallback_loglinear_fit(
-    freqs: np.ndarray,
-    log_psd: np.ndarray,
-    bands: dict[str, tuple[float, float]],
-    cfg: dict,
-) -> tuple[float, float, str]:
-    """Robust linear fit in log-log space, downweighting positive peaks."""
-    fit_lo, fit_hi = cfg.get("fit_range", [2.0, 40.0])
-    mask = (freqs >= float(fit_lo)) & (freqs <= float(fit_hi))
-    mask &= np.isfinite(log_psd)
-    mask &= ~_range_mask(freqs, cfg.get("exclude_ranges", []))
-    if cfg.get("exclude_target_bands_in_fallback", True):
-        target_ranges = [[lo, hi] for lo, hi in bands.values()]
-        mask &= ~_range_mask(freqs, target_ranges)
-
-    if int(mask.sum()) < 5:
-        mask = (freqs >= float(fit_lo)) & (freqs <= float(fit_hi)) & np.isfinite(log_psd)
-
-    x = np.log10(freqs[mask])
-    y = log_psd[mask]
-    if x.size < 5:
-        raise ValueError("Too few bins for fallback aperiodic fit.")
-
-    keep = np.ones(x.shape, dtype=bool)
-    slope = np.nan
-    intercept = np.nan
-    iterations = int(cfg.get("robust_iterations", 4))
-    z_lim = float(cfg.get("robust_positive_residual_z", 2.5))
-
-    for _ in range(max(1, iterations)):
-        if int(keep.sum()) < 5:
-            keep = np.ones(x.shape, dtype=bool)
-        slope, intercept = np.polyfit(x[keep], y[keep], deg=1)
-        residual = y - (slope * x + intercept)
-        scale = _mad(residual[keep])
-        if scale <= 0:
-            break
-        keep = residual <= (np.median(residual[keep]) + z_lim * scale)
-
-    return float(slope), float(intercept), "loglinear_fallback"
-
-
 def _specparam_fit(
     freqs: np.ndarray,
     psd: np.ndarray,
     cfg: dict,
 ) -> tuple[float, float, str]:
-    """Fit the aperiodic component with specparam when available."""
+    """Fit the aperiodic component with required specparam."""
     from specparam import SpectralModel
 
     peak_width_limits = cfg.get("specparam_peak_width_limits", [1.0, 12.0])
@@ -154,7 +119,7 @@ def _specparam_fit(
         peak_width_limits=tuple(float(v) for v in peak_width_limits),
         verbose=False,
     )
-    fit_range = [float(v) for v in cfg.get("fit_range", [2.0, 40.0])]
+    fit_range = [float(v) for v in cfg.get("fit_range", [2.0, 20.0])]
     model.fit(freqs, psd, fit_range)
     params = np.asarray(model.get_params("aperiodic"), dtype=float)
     if params.size < 2 or not np.all(np.isfinite(params[:2])):
@@ -175,28 +140,18 @@ def fit_aperiodic_and_residual(
     eps = np.finfo(float).tiny
     log_psd = np.log10(np.maximum(psd, eps))
 
-    method = str(aperiodic_cfg.get("method", "specparam_if_available")).lower()
-    fit_error = None
-    if method in {"specparam", "specparam_if_available"}:
-        try:
-            slope, intercept, fit_method = _specparam_fit(freqs, psd, aperiodic_cfg)
-        except Exception as exc:
-            fit_error = exc
-            if method == "specparam":
-                raise
-            slope, intercept, fit_method = _fallback_loglinear_fit(
-                freqs, log_psd, bands, aperiodic_cfg
-            )
-            fit_method = f"{fit_method}_after_specparam_failure"
-    else:
-        slope, intercept, fit_method = _fallback_loglinear_fit(
-            freqs, log_psd, bands, aperiodic_cfg
+    method = str(aperiodic_cfg.get("method", "specparam")).lower()
+    if method != "specparam":
+        raise ValueError(
+            "PAC phase QC requires aperiodic.method = 'specparam'. "
+            "Fallback aperiodic fitting is intentionally disabled."
         )
+    slope, intercept, fit_method = _specparam_fit(freqs, psd, aperiodic_cfg)
 
     aperiodic_log = intercept + slope * np.log10(freqs)
     residual_log = log_psd - aperiodic_log
 
-    fit_lo, fit_hi = aperiodic_cfg.get("fit_range", [2.0, 40.0])
+    fit_lo, fit_hi = aperiodic_cfg.get("fit_range", [2.0, 20.0])
     noise_mask = (freqs >= float(fit_lo)) & (freqs <= float(fit_hi))
     noise_mask &= ~_range_mask(freqs, [[lo, hi] for lo, hi in bands.values()])
     noise = _mad(residual_log[noise_mask])
@@ -218,9 +173,6 @@ def fit_aperiodic_and_residual(
         aperiodic_method=fit_method,
         residual_noise_mad=float(noise),
     )
-    if fit_error is not None:
-        # Keep the failure visible through method text without breaking metrics.
-        out.aperiodic_method = f"{out.aperiodic_method}"
     return out
 
 

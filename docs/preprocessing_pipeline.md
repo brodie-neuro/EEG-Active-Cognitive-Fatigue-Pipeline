@@ -69,6 +69,11 @@ dedicated `p3b_erp` branch and the main `pac` epochs.
 | H2 | `postprocessing/09_alpha_gamma_pac.py` | alpha-gamma PAC |
 | H3 | `postprocessing/10_erp_p3b.py` | posterior P3b cluster |
 
+**H1 (theta-gamma PAC) is the primary confirmatory analysis.** H2 (alpha-gamma PAC) and H3
+(P3b amplitude) are secondary analyses: both carry directional predictions and are reported
+with effect sizes, p-values, and Bayes factors, but they are not the primary
+sample-size-justifying endpoint and a null result in either does not disconfirm the study.
+
 `run_pipeline.py --mode full` runs the core path through step 11. EMG
 sensitivity is a follow-up workflow: run `13_emg_pca_covariates.py`, then
 `08b_pac_emg_corrected.py`, then `14_emg_pac_correlation.py`.

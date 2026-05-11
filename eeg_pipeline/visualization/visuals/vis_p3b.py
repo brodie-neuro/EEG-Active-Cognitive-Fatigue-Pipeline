@@ -340,8 +340,8 @@ def main():
                         help="One or more subjects (e.g. sub-p006 sub-p003)")
     parser.add_argument("--group", action="store_true",
                         help="Generate group-level summary only")
-    parser.add_argument("--exclude", nargs="*", default=["sub-p005"],
-                        help="Exclude from group plot (default: sub-p005)")
+    parser.add_argument("--exclude", nargs="*", default=["sub-p005", "sub-p013"],
+                        help="Exclude from group plot (default: sub-p005 sub-p013)")
     args = parser.parse_args()
 
     if args.group:

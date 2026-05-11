@@ -1,6 +1,6 @@
 # eeg_pipeline/postprocessing/09_alpha_gamma_pac.py
 """
-Step 09 - Between-region alpha-gamma phase-amplitude coupling (H2).
+Step 09 - Secondary between-region alpha-gamma phase-amplitude coupling (H2).
 
 Computes frontal alpha (8-13 Hz) phase × parietal gamma (55-85 Hz) amplitude
 PAC using the same trial-concatenated MI + circular-shift surrogates method
@@ -9,8 +9,9 @@ as step 08 (theta-gamma PAC).
   Phase: C_broad_F (Fz, FCz, F3, F4, FC1, FC2, FC3, FC4)
   Amplitude: C_broad_P (Pz, POz, P3, P4, P1, P2, PO3, PO4)
 
-This mirrors the frontoparietal topology of theta-gamma PAC (H1) but indexes
-a distinct confirmatory cross-frequency interaction:
+This secondary H2 analysis mirrors the frontoparietal topology of theta-gamma
+PAC (H1) but indexes a distinct theoretically motivated cross-frequency
+interaction:
 alpha-mediated executive gating rather than theta-mediated temporal
 organisation of WM content.
 
@@ -102,7 +103,7 @@ def _normalise_alpha_gamma_rows(df):
         legacy_mask = df["variant"].astype(str).isin(LEGACY_VARIANTS)
         df.loc[legacy_mask, "variant"] = PRIMARY_VARIANT
         if "role" in df.columns:
-            df.loc[df["variant"].astype(str).eq(PRIMARY_VARIANT), "role"] = "CONFIRMATORY"
+            df.loc[df["variant"].astype(str).eq(PRIMARY_VARIANT), "role"] = "SECONDARY"
     return df
 
 
@@ -369,7 +370,7 @@ def _save_incremental(rows, out_csv, logger):
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Alpha-gamma PAC (H2)')
+        description='Secondary alpha-gamma PAC (H2)')
     parser.add_argument('--no-plots', action='store_true',
                         help='Skip diagnostic figures')
     parser.add_argument('--subject', type=str, default=None,
@@ -381,7 +382,7 @@ def main():
 
     logger = _setup_logging()
     logger.info("=" * 60)
-    logger.info("Step 09: Alpha-Gamma PAC (H2)")
+    logger.info("Step 09: Secondary Alpha-Gamma PAC (H2)")
     logger.info("=" * 60)
 
     cfg = load_config()
@@ -409,7 +410,7 @@ def main():
     variants = [
         {
             'label': PRIMARY_VARIANT,
-            'role': 'CONFIRMATORY',
+            'role': 'SECONDARY',
             'phase_chs': frontal_chs,
             'phase_desc': PHASE_NODE,
             'amp_chs': parietal_chs,

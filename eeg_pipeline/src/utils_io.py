@@ -113,6 +113,44 @@ def subject_matches(subject_or_derivative_id: str, selected_subjects: set[str] |
     return bool(norm) and norm in selected_subjects
 
 
+def _channel_list(value) -> list[str]:
+    """Normalize a config channel field to a de-duplicated list of names."""
+    if value is None:
+        return []
+    if isinstance(value, str):
+        raw_values = re.split(r"[,;\s]+", value)
+    elif isinstance(value, Iterable):
+        raw_values = list(value)
+    else:
+        raw_values = [value]
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw_values:
+        channel = str(item).strip()
+        if not channel:
+            continue
+        key = channel.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(channel)
+    return out
+
+
+def _merge_channel_lists(*values) -> list[str]:
+    merged: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        for channel in _channel_list(value):
+            key = channel.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(channel)
+    return merged
+
+
 def _subject_from_filename(path_like: str | Path) -> str:
     stem = Path(path_like).stem
     if "_block" in stem:
@@ -387,6 +425,10 @@ def load_participant_config(subject_id: str) -> dict:
     """
     base = subject_base(subject_id)  # strip block suffix
     config_dir = Path(__file__).resolve().parents[1] / "config" / "participant_configs"
+    try:
+        defaults = (load_config().get("participant_defaults", {}) or {})
+    except Exception:
+        defaults = {}
 
     # Try with and without sub- prefix
     candidates = [
@@ -398,13 +440,25 @@ def load_participant_config(subject_id: str) -> dict:
         if p.exists():
             with open(p, "r", encoding="utf-8") as f:
                 data = json.load(f)
-            # Ensure required keys exist
-            data.setdefault("known_bad_eeg", [])
-            data.setdefault("known_bad_emg", [])
+            # Ensure required keys exist and merge older importer fields.
+            # "bad_channels" is retained as a legacy alias for EEG bads.
+            data["known_bad_eeg"] = _merge_channel_lists(
+                defaults.get("known_bad_eeg", []),
+                data.get("known_bad_eeg", []),
+                data.get("bad_channels", []),
+            )
+            data["known_bad_emg"] = _merge_channel_lists(
+                defaults.get("known_bad_emg", []),
+                data.get("known_bad_emg", []),
+            )
             data.setdefault("notes", "")
             return data
 
-    return {"known_bad_eeg": [], "known_bad_emg": [], "notes": ""}
+    return {
+        "known_bad_eeg": _channel_list(defaults.get("known_bad_eeg", [])),
+        "known_bad_emg": _channel_list(defaults.get("known_bad_emg", [])),
+        "notes": "",
+    }
 
 def read_raw(path, fmt, montage):
     """Read a raw EEG file either using an explicit format or auto by extension."""

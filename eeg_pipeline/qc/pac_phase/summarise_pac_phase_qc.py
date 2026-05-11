@@ -95,7 +95,7 @@ def write_summary_report(
     lines = [
         "# PAC Phase Spectral QC Summary",
         "",
-        "This QC check used the cleaned PAC epoch stream, the broad frontal phase node, and the same 0.0-0.6 s analysis-window samples used by the PAC analyses. Welch spectra were fit with an aperiodic background, and theta/alpha support was summarised from positive residual spectral mass using centre of mass as the primary frequency estimate.",
+        "This QC check used the cleaned PAC epoch stream, the broad frontal phase node, and the same 0.0-0.6 s analysis-window samples used by the PAC analyses. Welch spectra used 2 s windows with zero-padding for the displayed/readout frequency grid, were fit with a required specparam aperiodic model over 2-20 Hz, and theta/alpha support was summarised from positive residual spectral mass using centre of mass as the primary frequency estimate.",
         "",
         "## Status Counts",
         "",
@@ -107,7 +107,7 @@ def write_summary_report(
         "",
         "## Suggested Reporting Paragraph",
         "",
-        "PAC phase-band QC was performed on the same cleaned frontal epoch samples used for theta-gamma and alpha-gamma PAC estimation. For each participant and block, the broad frontal spectrum was parameterised into aperiodic and residual components, and theta/alpha centre-of-mass estimates were computed only when positive in-band residual spectral support was present. Participant-blocks without meaningful residual support were marked phase-indeterminate rather than assigned a forced frequency estimate.",
+        "PAC phase-band QC was performed on the same cleaned frontal epoch samples used for theta-gamma and alpha-gamma PAC estimation. For each participant and block, the broad frontal spectrum was parameterised into specparam aperiodic and residual components over 2-20 Hz, with zero-padding used only to refine the plotted/readout frequency grid. Theta/alpha centre-of-mass estimates were computed only when positive in-band residual spectral support was present. Participant-blocks without meaningful residual support were marked phase-indeterminate rather than assigned a forced frequency estimate.",
         "",
     ]
     output_path.write_text("\n".join(lines), encoding="utf-8")

@@ -27,7 +27,7 @@ CHANNELS = ["Pz", "P1", "P2", "POz"]
 P3B_WINDOW = (0.300, 0.500)
 CROP = (-0.100, 0.650)
 LP_FREQ = 12.0
-EXCLUDE = ["sub-p005", "sub-p010"]
+EXCLUDE = ["sub-p005", "sub-p013"]
 
 COLOR_B1 = "#2166AC"
 COLOR_B5 = "#B2182B"
@@ -75,7 +75,7 @@ def main():
         epoch_type="p3b_erp", require_all_blocks=True,
     )
     subjects = [s for s in subjects if s not in EXCLUDE]
-    print(f"Subjects (excl p005): {subjects}")
+    print(f"Subjects (excluded {', '.join(EXCLUDE) or 'none'}): {subjects}")
 
     all_erps = {1: [], 5: []}
 

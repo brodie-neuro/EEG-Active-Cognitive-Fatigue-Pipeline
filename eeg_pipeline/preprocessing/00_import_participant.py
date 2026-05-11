@@ -15,8 +15,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import re
 from pathlib import Path
 import sys
+
+os.environ["MNE_DONTWRITE_HOME"] = "true"
+os.environ.setdefault("_MNE_FAKE_HOME_DIR", str(Path(__file__).resolve().parents[1]))
 
 import mne
 import numpy as np
@@ -50,6 +55,8 @@ DEFAULT_CHANNEL_TYPES = {
     "BVEOG": "misc",
     "TVEOG": "misc",
     "M1": "misc",
+    "M2": "misc",
+    "TP9": "misc",
 }
 
 
@@ -63,6 +70,7 @@ def _safe_adapter_name(subject_id: str) -> str:
 
 
 def _default_config(subject_id: str, input_path: Path) -> dict:
+    defaults = _study_participant_defaults()
     return {
         "subject_id": subject_id,
         "input_path": str(input_path),
@@ -73,10 +81,84 @@ def _default_config(subject_id: str, input_path: Path) -> dict:
         "rest_min_duration_s": 30.0,
         "channel_renames": dict(DEFAULT_RENAMES),
         "channel_types": dict(DEFAULT_CHANNEL_TYPES),
-        "bad_channels": [],
+        "known_bad_eeg": _channel_list(defaults.get("known_bad_eeg", [])),
+        "known_bad_emg": _channel_list(defaults.get("known_bad_emg", [])),
         "event_map": {"1": "stim", "2": "stim/offset"},
         "stim_event_label": "1",
     }
+
+
+def _channel_list(value) -> list[str]:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        raw_values = re.split(r"[,;\s]+", value)
+    elif isinstance(value, (list, tuple, set)):
+        raw_values = list(value)
+    else:
+        raw_values = [value]
+
+    out: list[str] = []
+    seen: set[str] = set()
+    for item in raw_values:
+        channel = str(item).strip()
+        if not channel:
+            continue
+        key = channel.lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(channel)
+    return out
+
+
+def _merge_channels(*values) -> list[str]:
+    merged: list[str] = []
+    seen: set[str] = set()
+    for value in values:
+        for channel in _channel_list(value):
+            key = channel.lower()
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append(channel)
+    return merged
+
+
+def _study_participant_defaults() -> dict:
+    try:
+        return load_config().get("participant_defaults", {}) or {}
+    except Exception:
+        return {}
+
+
+def _normalise_participant_config(cfg: dict, subject_id: str, input_path: Path) -> dict:
+    defaults = _study_participant_defaults()
+    cfg["subject_id"] = subject_id
+    cfg["input_path"] = str(input_path)
+    cfg.setdefault("gap_threshold_s", 30.0)
+    cfg.setdefault("exclude_warmup", True)
+    cfg.setdefault("task_blocks_to_keep", [1, 5])
+    cfg.setdefault("rest_buffer_s", 2.0)
+    cfg.setdefault("rest_min_duration_s", 30.0)
+    cfg["channel_renames"] = {**DEFAULT_RENAMES, **(cfg.get("channel_renames", {}) or {})}
+    cfg["channel_types"] = {**DEFAULT_CHANNEL_TYPES, **(cfg.get("channel_types", {}) or {})}
+    cfg.setdefault("event_map", {"1": "stim", "2": "stim/offset"})
+    cfg.setdefault("stim_event_label", "1")
+    cfg.setdefault("notes", "")
+
+    # Older generated configs used "bad_channels". Keep it as a legacy alias,
+    # but make known_bad_eeg / known_bad_emg the canonical fields.
+    cfg["known_bad_eeg"] = _merge_channels(
+        defaults.get("known_bad_eeg", []),
+        cfg.get("known_bad_eeg", []),
+        cfg.get("bad_channels", []),
+    )
+    cfg["known_bad_emg"] = _merge_channels(
+        defaults.get("known_bad_emg", []),
+        cfg.get("known_bad_emg", []),
+    )
+    return cfg
 
 
 def _load_or_create_config(config_path: Path, subject_id: str, input_path: Path) -> dict:
@@ -85,8 +167,9 @@ def _load_or_create_config(config_path: Path, subject_id: str, input_path: Path)
             data = json.load(f)
         if not isinstance(data, dict):
             raise ValueError(f"Participant config must be a JSON object: {config_path}")
-        return data
+        return _normalise_participant_config(data, subject_id, input_path)
     data = _default_config(subject_id, input_path)
+    data = _normalise_participant_config(data, subject_id, input_path)
     config_path.parent.mkdir(parents=True, exist_ok=True)
     with open(config_path, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2)
@@ -113,7 +196,9 @@ def _save_adapter(subject_id: str, cfg: dict) -> Path:
         "event_map": cfg.get("event_map", {"1": "stim", "2": "stim/offset"}),
         "channel_renames": cfg.get("channel_renames", {}),
         "channel_types": cfg.get("channel_types", {}),
-        "bad_channels": cfg.get("bad_channels", []),
+        "known_bad_eeg": cfg.get("known_bad_eeg", []),
+        "known_bad_emg": cfg.get("known_bad_emg", []),
+        "bad_channels": cfg.get("known_bad_eeg", []),
     }
     ADAPTERS_DIR.mkdir(parents=True, exist_ok=True)
     with open(out, "w", encoding="utf-8") as f:
@@ -175,22 +260,22 @@ def _smart_warmup_exclusion(segments: list[np.ndarray], sfreq: float) -> list[np
     if first_n < lower:
         # Case 1: First segment is clearly a standalone warmup (few events)
         warmup_dur = (segments[0][-1, 0] - segments[0][0, 0]) / sfreq
-        print(f"  Warmup detected: segment 1 has {first_n} events "
+        print(f"  Practice/warmup detected: segment 1 has {first_n} events "
               f"({warmup_dur:.0f}s), typical block has {median_block}. Dropping.")
         return segments[1:]
 
     elif first_n > upper:
         # Case 2: Warmup merged with Block 1 (no gap between them)
         excess = first_n - median_block
-        print(f"  Warmup+Block1 merge detected: segment 1 has {first_n} events "
-              f"(expected ~{median_block}). Splitting off {excess} warmup events.")
+        print(f"  Practice/warmup+Block1 merge detected: segment 1 has {first_n} events "
+              f"(expected ~{median_block}). Splitting off {excess} practice events.")
         # Keep only the last median_block events as Block 1
         block1_events = segments[0][-median_block:]
         return [block1_events] + segments[1:]
 
     else:
         # Case 3: First segment looks like a normal task block; no warmup found
-        print(f"  No warmup detected: segment 1 has {first_n} events "
+        print(f"  No separate practice/warmup segment detected: segment 1 has {first_n} events "
               f"(~{median_block} expected). Keeping all segments.")
         return segments
 
@@ -220,10 +305,12 @@ def _apply_channel_config(raw: mne.io.BaseRaw, cfg: dict) -> None:
         raw.set_channel_types(ch_types, verbose=False)
 
     bads = []
-    for ch in cfg.get("bad_channels", []) or []:
-        if ch in raw.ch_names:
-            bads.append(ch)
-    raw.info["bads"] = bads
+    existing_lower = {ch.lower(): ch for ch in raw.ch_names}
+    for ch in cfg.get("known_bad_eeg", []) or []:
+        actual = existing_lower.get(str(ch).strip().lower())
+        if actual:
+            bads.append(actual)
+    raw.info["bads"] = sorted(set(bads))
 
 
 def _parse_blocks(blocks_arg: str | None, cfg: dict) -> list[int]:
@@ -253,14 +340,12 @@ def main() -> None:
     subject_id = normalize_subject_id(args.subject) if args.subject.strip() else _derive_subject_id(input_path)
     cfg_path = Path(args.config).expanduser().resolve() if args.config.strip() else (PARTICIPANT_CFG_DIR / f"{subject_id}.json")
     participant_cfg = _load_or_create_config(cfg_path, subject_id, input_path)
-    participant_cfg["subject_id"] = subject_id
-    participant_cfg["input_path"] = str(input_path)
 
     study_cfg = load_config()
     montage = study_cfg.get("montage", "standard_1020")
 
     print(f"Loading CNT: {input_path}")
-    raw = mne.io.read_raw_cnt(str(input_path), preload=True, verbose=False)
+    raw = mne.io.read_raw_cnt(str(input_path), preload=False, verbose=False)
     raw.set_montage(montage, on_missing="ignore")
     _apply_channel_config(raw, participant_cfg)
 
@@ -272,6 +357,11 @@ def main() -> None:
     stim_events = events[events[:, 2] == stim_id]
     if len(stim_events) == 0:
         raise RuntimeError(f"No stimulus events found for event id {stim_id}.")
+
+    if participant_cfg.get("known_bad_eeg"):
+        print(f"Known bad EEG channels: {participant_cfg['known_bad_eeg']}")
+    if participant_cfg.get("known_bad_emg"):
+        print(f"Known bad EMG channels: {participant_cfg['known_bad_emg']}")
 
     gap_threshold = float(args.gap_threshold if args.gap_threshold is not None else participant_cfg.get("gap_threshold_s", 30.0))
     rest_min_duration = float(
@@ -300,7 +390,10 @@ def main() -> None:
         t_start = seg[0, 0] / raw.info["sfreq"]
         t_end = min(raw.times[-1], seg[-1, 0] / raw.info["sfreq"] + rest_buffer)
         out = RAW_DIR / f"{subject_id}_block{block}-task.fif"
-        print(f"Saving block {block}: {t_start:.1f}s to {t_end:.1f}s -> {out.name}")
+        print(
+            f"Saving block {block}: {t_start:.1f}s to {t_end:.1f}s "
+            f"({len(seg)} kept stimulus events) -> {out.name}"
+        )
         raw.copy().crop(tmin=t_start, tmax=t_end).save(out, overwrite=True, verbose=False)
         written_blocks.append(str(out))
 

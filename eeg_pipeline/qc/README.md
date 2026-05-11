@@ -1,10 +1,11 @@
 # Integrated QC Workflows
 
 This folder contains automated QC-only workflows that run alongside the main
-preprocessing and confirmatory analyses.
+preprocessing and the primary confirmatory and secondary analyses.
 
-The QC outputs are descriptive. They do not alter the main theta-gamma PAC,
-alpha-gamma PAC, or P3b feature tables.
+The QC outputs are descriptive. They do not alter the primary confirmatory
+theta-gamma PAC (H1), secondary alpha-gamma PAC (H2), or secondary P3b (H3)
+feature tables.
 
 ## Run
 
@@ -41,6 +42,11 @@ Purpose:
 - use the same cleaned `pac` epochs and the same `0.0-0.6 s` PAC analysis
   window
 - use the broad frontal phase node (`C_broad_F`)
+- compute Welch spectra with 2 s Hann windows, 50% overlap, and 4x
+  zero-padding for a smoother frequency grid; the true resolution is still
+  set by the 2 s window
+- remove the aperiodic component with specparam over 2-20 Hz; no fallback
+  aperiodic model is used
 - compute residual spectral centre of mass only when positive residual support
   is present
 

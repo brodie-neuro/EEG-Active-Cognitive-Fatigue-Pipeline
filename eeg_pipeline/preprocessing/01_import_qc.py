@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.utils_io import (
     load_config,
+    load_participant_config,
     glob_subjects,
     read_raw,
     subject_id_from_path,
@@ -126,7 +127,7 @@ def main():
         # Posterior neck = monopolar: TP7 (left), TP8 (right)
         emg_channels = ["F7", "FT7", "F8", "FT8", "TP7", "TP8"]
         # Mastoid references and unused aux inputs have no montage position.
-        misc_channels = ["M1", "M2", "BVEOG", "TVEOG"]
+        misc_channels = ["M1", "M2", "TP9", "BVEOG", "TVEOG"]
         # AF7/AF8 are scalp EEG — some raw FIFs have them pre-typed as eog.
         # Force them to eeg for consistency across all participants.
         eeg_override = ["AF7", "AF8"]
@@ -160,7 +161,16 @@ def main():
         raw.set_montage(make_standard_montage(cfg['montage']), on_missing='ignore')
         # -------------------------------------
 
-        raw.info["bads"] = []
+        pconfig = load_participant_config(subj)
+        existing_lower = {ch.lower(): ch for ch in raw.ch_names}
+        known_bad_eeg = []
+        for ch in pconfig.get("known_bad_eeg", []) or []:
+            actual = existing_lower.get(str(ch).strip().lower())
+            if actual:
+                known_bad_eeg.append(actual)
+        raw.info["bads"] = sorted(set(known_bad_eeg))
+        if known_bad_eeg:
+            logger.info("Known bad EEG channels from participant config: %s", known_bad_eeg)
 
         # 3b) Shared preprocessing bandpass (from parameters.json)
         filt_params = get_param('filtering', default={})
@@ -187,7 +197,7 @@ def main():
         # 3c) Automatic bad channel suggestion
         # Note: This function only looks at 'eeg' channels now.
         # Since we changed EMG_L to type 'emg' above, it will be IGNORED here.
-        bads = find_bad_channels(raw_main)
+        bads = sorted(set(find_bad_channels(raw_main) + known_bad_eeg))
         raw_main.info["bads"] = bads
         if raw_erp is not None:
             raw_erp.info["bads"] = list(bads)

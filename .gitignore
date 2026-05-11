@@ -213,3 +213,4 @@ P3b_review/
 # --- 31. Local exploratory analyses, not part of public pipeline ---
 exploratory_analysis/
 interesting_analysis/
+excluded/

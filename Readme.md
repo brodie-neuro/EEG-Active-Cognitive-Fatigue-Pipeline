@@ -15,33 +15,37 @@
 This repository contains a scripted EEG pre-processing and analysis pipeline for studying active cognitive fatigue. It is designed for 64-channel EEG, with a specific emphasis on:
 
 - preserving task-relevant gamma-band signal rather than cleaning it away aggressively;
-- quantifying frontoparietal theta-gamma PAC as the primary confirmatory measure, with alpha-gamma PAC and P3b as secondary confirmatory measures;
+- quantifying frontoparietal theta-gamma PAC as the primary confirmatory measure, with P3b as a secondary ERP measure and alpha-gamma PAC as a secondary theoretically motivated PAC analysis;
 - using a fully automated, highly complex, and reproducible pre-processing pipeline that incorporates rigorous quality control (QC) checks, EMG sensitivity controls, and deterministic execution to ensure robust outputs;
 - tracking pre-processing decisions with deterministic settings and step-level QC logs;
-- handling known subject-specific bad channels explicitly through per-participant config.
+- handling known subject-specific bad channels explicitly through per-participant config;
+- executing a rigorous Sequential Bayes Factor Design (SBFD) to determine the final sample size based strictly on the primary hypothesis ($N_{min}=20$, $N_{max}=30$, target $BF_{10}>5$).
 
 The pipeline is written in Python around MNE-Python and related EEG tooling.
 
 ## Associated Research
 
-This repository operationalises the working-memory account of active cognitive
-fatigue proposed by Mangan and Kourtis:
+This repository is strictly constrained by the theoretical framework established in two foundational papers. 
+
+First, the specific **EEG markers** and theoretical parameters expected to change under fatigue are constrained by:
 
 - Mangan, B. E., & Kourtis, D. (2026). The Missing Link: Bridging Cognitive
-  Fatigue with Working Memory. Journal of Cognitive Neuroscience, 38(4),
+  Fatigue with Working Memory. *Journal of Cognitive Neuroscience*, 38(4),
   669-679. https://doi.org/10.1162/JOCN.a.2398
 
-The EEG study uses the WAND active cognitive fatigue induction framework
-described in the Mangan preprint:
+This paper acts similarly to a pre-registration: it defines the neural systems of interest *a priori*, preventing operational drift during analysis.
+
+Second, the **definition of active cognitive fatigue** and the WAND induction framework used to safely elicit it are defined in:
 
 - Mangan, B. E., Tomaz, S. A., & Kourtis, D. (2026). The Missing Link:
   Validating the Working Memory Adaptive Fatigue with N-Back Difficulty
-  Protocol for Active Cognitive Fatigue Induction. PsyArXiv preprint, under
+  Protocol for Active Cognitive Fatigue Induction. *PsyArXiv* preprint, under
   review at PLOS ONE. https://doi.org/10.31234/osf.io/h4n2w_v1
 
 The analysis tests whether sustained active cognitive demand changes a primary
-EEG marker, frontoparietal theta-gamma PAC, plus two secondary EEG markers:
-frontoparietal alpha-gamma PAC and P3b amplitude/latency.
+EEG marker, frontoparietal theta-gamma PAC. It also reports a secondary
+ERP marker, P3b amplitude/latency, and a secondary theoretically
+motivated alpha-gamma PAC analysis.
 
 The main active pre-processing path is a single shared `1-100 Hz` continuous stream. In practice, that means a shared `1 Hz` high-pass oscillatory path: ASR and ICA both run directly on the same incoming stream rather than creating internal fit-only copies.
 
@@ -59,7 +63,7 @@ This pipeline addresses these problems in three ways:
 
 2. **Explicit EMG control.** Rather than assuming gamma-band activity is neural, the pipeline includes dedicated EMG channels, PCA-based muscle covariates, and regression-based sensitivity checks. Importantly, we do not look at gamma specifically itself; all the gamma is implicitly included in how the amplitude corresponds with the phase of theta. The EMG controls evaluate a corrected PAC and a delta regression against the PC1. EMG outputs serve as diagnostic controls and do not automatically exclude confirmatory PAC blocks.
 
-3. **Documented parameter choices.** All major parameters are centralised in config files with written rationale ([PARAMETERS.md](PARAMETERS.md)), separating the primary confirmatory analysis (H1 theta-gamma PAC), secondary confirmatory analyses (H2 alpha-gamma PAC, H3 P3b), QC, and EMG sensitivity checks.
+3. **Documented parameter choices.** All major parameters are centralised in config files with written rationale ([PARAMETERS.md](PARAMETERS.md)), separating the primary confirmatory analysis (H1 theta-gamma PAC), the secondary theoretically motivated H2 alpha-gamma PAC analysis, the secondary H3 P3b analysis, QC, and EMG sensitivity checks.
 
 The goal is an auditable, reproducible EEG workflow where pre-processing decisions are visible and their consequences can be evaluated.
 
@@ -88,7 +92,8 @@ For PAC, `--mode full` produces the primary confirmatory outputs without automat
 | Type | Steps | Measures |
 |:-----|:------|:---------|
 | **Primary confirmatory** | 08 | Fixed 4-8 Hz theta-gamma PAC |
-| **Secondary confirmatory** | 09, 10 | Fixed 8-13 Hz alpha-gamma PAC, P3b mean amplitude and fractional area latency (Luck, 2014) |
+| **Secondary PAC analysis** | 09 | Fixed 8-13 Hz alpha-gamma PAC |
+| **Secondary ERP** | 10 | P3b mean amplitude and fractional area latency (Luck, 2014) |
 | **Quality control** | `qc/`, 12 | PAC phase-band spectral support QC, P3b visual QC dashboards, pre-processing QC summary |
 | **EMG sensitivity** | 08b, 09b, 13, 14, 15 | EMG covariates, theta-gamma and alpha-gamma EMG-corrected PAC, group-level EMG-PAC delta correlations |
 
@@ -98,7 +103,7 @@ Method hierarchy:
 
 - The shared `1 Hz` high-pass path is the live oscillatory pipeline for ASR, ICA, theta-gamma PAC, and alpha-gamma PAC.
 - A separate `0.1 Hz` ERP branch exists only for conservative P3b estimation.
-- Confirmatory PAC phase band is fixed at `4-8 Hz` (theta-gamma, H1) and `8-13 Hz` (alpha-gamma, H2).
+- The primary confirmatory PAC phase band is fixed at `4-8 Hz` (theta-gamma, H1). The secondary H2 alpha-gamma PAC phase band is fixed at `8-13 Hz`.
 
 ## Design Principles
 
@@ -176,7 +181,7 @@ EEG_study_2/
 | 07 | `07_autoreject.py` | epoch-level repair and rejection for `p3b_erp` and `pac` epoch sets |
 | 08 | `08_pac_nodal.py` | theta-gamma phase-amplitude coupling (H1) |
 | 08b | `08b_pac_emg_corrected.py` | PAC recomputed after regressing EMG PC1 out of parietal gamma signal at each time point (sensitivity check) |
-| 09 | `09_alpha_gamma_pac.py` | alpha-gamma phase-amplitude coupling (H2) |
+| 09 | `09_alpha_gamma_pac.py` | secondary alpha-gamma phase-amplitude coupling (H2) |
 | 09b | `09b_alpha_gamma_pac_emg_corrected.py` | alpha-gamma PAC recomputed after regressing EMG PC1 out of parietal gamma signal at each time point (H2 sensitivity check) |
 | 10 | `10_erp_p3b.py` | P3b mean amplitude and fractional area latency (50%) from the dedicated `p3b_erp` branch (H3) |
 | 11 | `11_merge_features.py` | merge core feature tables |
@@ -203,11 +208,11 @@ Steps 13, 08b, 09b, 14, and 15 remain part of the EMG sensitivity workflow even 
 
 Because gamma-band activity overlaps spectrally with scalp muscle (EMG) contamination, the pipeline includes layered EMG checks rather than treating any single procedure as a complete separation of neural gamma from muscle artefact:
 
-1. **Steps 08b and 09b: EMG-corrected PAC.** Regress EMG PC1 out of the parietal signal at every time point across trials, then recompute PAC from the corrected signal using the same method as the corresponding primary analysis: step 08 for theta-gamma and step 09 for alpha-gamma.
+1. **Steps 08b and 09b: EMG-corrected PAC.** Regress EMG PC1 out of the parietal signal at every time point across trials, then recompute PAC from the corrected signal using the same method as the corresponding PAC analysis: step 08 for theta-gamma and step 09 for alpha-gamma.
 
 2. **Steps 14 and 15: Group-level delta correlation.** Correlate participant-level change in EMG variance (B5 - B1) with change in theta-gamma PAC z-score and alpha-gamma PAC z-score respectively. A weak correlation is treated as diagnostic support against a simple EMG-change explanation, not as definitive separation of neural gamma from muscle activity.
 
-The H1 PAC result (step 08) is the primary confirmatory finding, while H2 alpha-gamma PAC (step 09) is secondary. Steps 08b, 09b, 14, and 15 are reported as sensitivity analyses that test whether the PAC effects track myogenic contamination.
+The H1 PAC result (step 08) is the primary confirmatory finding, while H2 alpha-gamma PAC (step 09) is a secondary theoretically motivated PAC analysis. Steps 08b, 09b, 14, and 15 are reported as sensitivity analyses that test whether the PAC effects track myogenic contamination.
 
 The time-point regression in steps 08b and 09b is intentionally conservative: it removes any trial-wise parietal variance linearly associated with EMG, not only proven muscle artefact. If the PAC pattern is similar after this correction, that provides sensitivity evidence against a simple peripheral-EMG explanation.
 

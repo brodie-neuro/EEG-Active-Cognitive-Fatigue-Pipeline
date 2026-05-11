@@ -22,6 +22,17 @@ The pipeline is built around four practical goals:
 3. keep the main preprocessing path deterministic and auditable
 4. separate confirmatory analyses from QC and sensitivity follow-up measures
 
+## Sample Size and Stopping Rule
+
+Data collection follows a **Sequential Bayes Factor Design** (Schönbrodt et al., 2017) driven exclusively by the primary hypothesis (H1: Theta-Gamma PAC). 
+
+To account for Bayes Factor volatility at small sample sizes and protect against premature stopping, we pre-established a minimum sample size of **$N_{min} = 20$**. Data collection is planned to terminate when the Bayes Factor for H1 exceeds $BF_{10} > 5$ (Moderate-to-Strong evidence), up to a resource-constrained maximum of **$N_{max} = 30$**. 
+
+### Rationale for H1 vs. H2/H3
+- **H1 (Theta-Gamma PAC):** Serves as the sole primary sample-size-justifying endpoint. This is theoretically grounded in our working memory account of active cognitive fatigue (Mangan & Kourtis, 2026, *Journal of Cognitive Neuroscience*), and supported by adjacent empirical evidence demonstrating theta-gamma network alterations during fatigue-inducing states in sleep deprivation and clinical populations.
+- **H2 (Alpha-Gamma PAC) & H3 (P3b):** These are strictly secondary. H2 is theoretically motivated by Miller et al.'s (2018) Working Memory 2.0 framework, but lacks the adjacent empirical scalp-EEG evidence seen for theta-gamma. Therefore, an *a priori* sample-size stopping rule for H2 is not appropriate. H2 and H3 are evaluated opportunistically at the final sample size dictated by the H1 stopping rule.
+
+
 ## Core Preprocessing Choices
 
 | Area | Current setting | Why it is used | Publication note |
@@ -49,9 +60,9 @@ The pipeline is built around four practical goals:
 | PAC amplitude band | `55-85 Hz` gamma | Narrow enough to avoid lower-frequency bleed while still targeting task-relevant high gamma. | Important to keep coupled with the EMG-control story. |
 | PAC null model | `500` surrogates | Enough to generate a stable z-scored modulation index without making runtime unreasonable. | Reasonable compromise between speed and null stability. |
 | PAC edge trimming | `trim = 0.1 s` | Reduces edge artifacts in filtered analytic signals. | Sensible implementation detail worth keeping explicit. |
-| Alpha-gamma PAC | secondary H2 between-region alpha(8-13 Hz)-gamma(55-85 Hz) PAC in stimulus window | C_broad_F→C_broad_P, mirroring the frontoparietal topology of H1 theta-gamma PAC but indexing alpha-mediated executive gating and prioritisation (Miller et al., 2018). Same MI + surrogate method as H1. | Keep labelled as secondary H2 anywhere the manuscript lists confirmatory outcomes. |
+| Alpha-gamma PAC | secondary theoretically motivated H2 between-region alpha(8-13 Hz)-gamma(55-85 Hz) PAC in stimulus window | C_broad_F->C_broad_P, mirroring the frontoparietal topology of H1 theta-gamma PAC but indexing alpha-mediated executive gating and prioritisation (Miller et al., 2018). Same MI + surrogate method as H1. | Keep labelled as secondary H2 rather than as the primary sample-size-justifying endpoint. Report effect estimates, intervals, p-values, and Bayes factors without treating a null result as definitive absence of effect. |
 
-| PAC phase-band QC | `pac_phase_qc` defaults to theta `4-8 Hz` and alpha `8-13 Hz` on `C_broad_F`, using cleaned PAC epochs and the `0.0-0.6 s` PAC analysis window | QC-only check that the phase-providing bands used by theta-gamma and alpha-gamma PAC show plausible residual spectral support above the aperiodic background. Centre of mass is computed only from positive residual spectral mass. | Report as interpretability/QC support, not as a new primary power analysis. Do not treat missing residual support as a forced peak estimate. |
+| PAC phase-band QC | `pac_phase_qc` defaults to theta `4-8 Hz` and alpha `8-13 Hz` on `C_broad_F`, using cleaned PAC epochs and the `0.0-0.6 s` PAC analysis window. Welch uses 2 s Hann windows with 50% overlap and `nfft_factor = 4` zero-padding. Aperiodic removal requires specparam with a `2-20 Hz` fit range. | QC-only check that the phase-providing bands used by theta-gamma and alpha-gamma PAC show plausible residual spectral support above the aperiodic background. Centre of mass is computed only from positive residual spectral mass. Zero-padding improves the plotted/readout frequency grid but does not increase true spectral resolution. | Report as interpretability/QC support, not as a new primary power analysis. Do not treat missing residual support as a forced peak estimate. |
 | P3b visual QC | `p3b_qc` uses the configured `p3b_erp` branch, P3b ROI, and `0.3-0.5 s` measurement window | Produces participant dashboards with ROI waveform, single-trial images, channel traces, and topography so P3b plausibility can be reviewed quickly. | Keep descriptive; this does not change the P3b feature extraction method. |
 
 Method hierarchy to keep explicit:
