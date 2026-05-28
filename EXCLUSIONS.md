@@ -15,6 +15,7 @@ Researchers applying this pipeline to a new dataset should create their own excl
 ## Implementation Notes
 
 - H2 alpha-gamma exclusions for this dataset are centralised in `alpha_gamma_pac.analysis_excluded_subjects` in `eeg_pipeline/config/parameters.json`.
+- The H2 R inference script reads this exclusion set when `jsonlite` is available and falls back to the same current IDs if the config cannot be read.
 - The H2 exclusion set is applied by `09b_alpha_gamma_pac_emg_corrected.py` and `15_emg_alpha_gamma_correlation.py`.
 - The H3 P3b exclusion is applied at the H3 inference/reporting stage. P3b feature extraction and P3b QC still retain the participant for audit.
 - Raw feature tables are not deleted or rewritten as the primary exclusion mechanism. Analysis-stage filtering is preferred so that QC review remains transparent.

@@ -53,6 +53,7 @@ eeg_pipeline/outputs/
 Raw Data/
 Real Data/
 Behavioural Data/
+unneeded data/
 real_data/
 pipeline.tgz
 .mne/
